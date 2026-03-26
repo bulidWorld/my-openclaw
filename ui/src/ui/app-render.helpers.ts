@@ -132,45 +132,6 @@ function renderCronFilterIcon(hiddenCount: number) {
   `;
 }
 
-export function renderChatSessionSelect(state: AppViewState) {
-  const sessionGroups = resolveSessionOptionGroups(state, state.sessionKey, state.sessionsResult);
-  const modelSelect = renderChatModelSelect(state);
-  return html`
-    <div class="chat-controls__session-row">
-      <label class="field chat-controls__session">
-        <select
-          .value=${state.sessionKey}
-          ?disabled=${!state.connected || sessionGroups.length === 0}
-          @change=${(e: Event) => {
-            const next = (e.target as HTMLSelectElement).value;
-            if (state.sessionKey === next) {
-              return;
-            }
-            switchChatSession(state, next);
-          }}
-        >
-          ${repeat(
-            sessionGroups,
-            (group) => group.id,
-            (group) =>
-              html`<optgroup label=${group.label}>
-                ${repeat(
-                  group.options,
-                  (entry) => entry.key,
-                  (entry) =>
-                    html`<option value=${entry.key} title=${entry.title}>
-                      ${entry.label}
-                    </option>`,
-                )}
-              </optgroup>`,
-          )}
-        </select>
-      </label>
-      ${modelSelect}
-    </div>
-  `;
-}
-
 export function renderChatControls(state: AppViewState) {
   const hideCron = state.sessionsHideCron ?? true;
   const hiddenCronCount = hideCron
@@ -181,6 +142,11 @@ export function renderChatControls(state: AppViewState) {
   const showThinking = state.onboarding ? false : state.settings.chatShowThinking;
   const showToolCalls = state.onboarding ? true : state.settings.chatShowToolCalls;
   const focusActive = state.onboarding ? true : state.settings.chatFocusMode;
+  const sessionGroups = resolveSessionOptionGroups(state, state.sessionKey, state.sessionsResult);
+  const currentSession = state.sessionsResult?.sessions?.find(
+    (row) => row.key === state.sessionKey,
+  );
+  const currentLabel = currentSession?.label?.trim() || currentSession?.displayName?.trim() || "";
   const toolCallsIcon = html`
     <svg
       width="18"
@@ -232,6 +198,47 @@ export function renderChatControls(state: AppViewState) {
   `;
   return html`
     <div class="chat-controls">
+      <label class="chat-controls__session-select">
+        <select
+          .value=${state.sessionKey}
+          ?disabled=${!state.connected || sessionGroups.length === 0}
+          @change=${(e: Event) => {
+            const next = (e.target as HTMLSelectElement).value;
+            if (state.sessionKey === next) {
+              return;
+            }
+            switchChatSession(state, next);
+          }}
+          title="Switch session"
+        >
+          ${repeat(
+            sessionGroups,
+            (group) => group.id,
+            (group) =>
+              html`<optgroup label=${group.label}>
+                ${repeat(
+                  group.options,
+                  (entry) => entry.key,
+                  (entry) =>
+                    html`<option value=${entry.key} title=${entry.title}>
+                      ${entry.label}
+                    </option>`,
+                )}
+              </optgroup>`,
+          )}
+        </select>
+      </label>
+      <button
+        class="btn btn--sm btn--icon"
+        ?disabled=${!state.connected}
+        @click=${async () => {
+          await createNewSession(state);
+        }}
+        title="New session"
+        aria-label="New session"
+      >
+        ${icons.plus}
+      </button>
       <button
         class="btn btn--sm btn--icon"
         ?disabled=${state.chatLoading || !state.connected}
@@ -258,6 +265,66 @@ export function renderChatControls(state: AppViewState) {
         ${refreshIcon}
       </button>
       <span class="chat-controls__separator">|</span>
+      ${renderChatModelSelect(state)}
+      <span class="chat-controls__separator">|</span>
+      ${
+        state.chatSessionEditing
+          ? html`
+            <label class="chat-controls__session-name-edit">
+              <input
+                type="text"
+                class="chat-controls__session-name-input"
+                .value=${state.chatSessionEditName ?? ""}
+                placeholder="Session name..."
+                @keydown=${async (e: KeyboardEvent) => {
+                  if (e.key === "Enter") {
+                    const input = e.target as HTMLInputElement;
+                    const newName = input.value;
+                    if (newName.trim()) {
+                      await renameCurrentSession(state, newName);
+                      state.chatSessionEditing = false;
+                    }
+                  } else if (e.key === "Escape") {
+                    state.chatSessionEditing = false;
+                  }
+                }}
+                @blur=${async (e: FocusEvent) => {
+                  const input = e.target as HTMLInputElement;
+                  if (input.value.trim()) {
+                    await renameCurrentSession(state, input.value);
+                  }
+                  state.chatSessionEditing = false;
+                }}
+                autofocus
+              />
+            </label>
+          `
+          : html`
+            <button
+              class="btn btn--sm btn--icon"
+              ?disabled=${!state.connected || !currentLabel}
+              @click=${() => {
+                state.chatSessionEditing = true;
+                state.chatSessionEditName = currentLabel;
+              }}
+              title="Rename session"
+              aria-label="Rename session"
+            >
+              ${icons.edit}
+            </button>
+          `
+      }
+      <button
+        class="btn btn--sm btn--icon btn--danger"
+        ?disabled=${!state.connected}
+        @click=${async () => {
+          await deleteCurrentSession(state);
+        }}
+        title="Delete session"
+        aria-label="Delete session"
+      >
+        ${icons.trash}
+      </button>
       <button
         class="btn btn--sm btn--icon ${showThinking ? "active" : ""}"
         ?disabled=${disableThinkingToggle}
@@ -509,6 +576,82 @@ export function switchChatSession(state: AppViewState, nextSessionKey: string) {
   );
   void loadChatHistory(state as unknown as ChatState);
   void refreshSessionOptions(state);
+}
+
+export async function createNewSession(state: AppViewState): Promise<string | null> {
+  const { createSession } = await import("./controllers/sessions.ts");
+
+  const agentId = (() => {
+    const parsed = parseAgentSessionKey(state.sessionKey);
+    return parsed?.agentId ?? "main";
+  })();
+
+  const newSessionKey = await createSession(
+    state as unknown as Parameters<typeof createSession>[0],
+    {
+      agentId,
+    },
+  );
+
+  if (newSessionKey) {
+    switchChatSession(state, newSessionKey);
+    await loadSessions(state as unknown as Parameters<typeof loadSessions>[0], {
+      activeMinutes: 0,
+      limit: 0,
+      includeGlobal: true,
+      includeUnknown: true,
+    });
+  }
+
+  return newSessionKey;
+}
+
+export async function deleteCurrentSession(state: AppViewState): Promise<boolean> {
+  const { deleteSessionsAndRefresh } = await import("./controllers/sessions.ts");
+
+  const confirmed = window.confirm(
+    `Delete this session?\n\nThis will remove the session from the list but archive the transcripts.`,
+  );
+
+  if (!confirmed) {
+    return false;
+  }
+
+  const deleted = await deleteSessionsAndRefresh(
+    state as unknown as Parameters<typeof deleteSessionsAndRefresh>[0],
+    [state.sessionKey],
+  );
+
+  if (deleted.length > 0) {
+    const agentId = (() => {
+      const parsed = parseAgentSessionKey(state.sessionKey);
+      return parsed?.agentId ?? "main";
+    })();
+    const mainSessionKey = `agent:${agentId}:main`;
+    switchChatSession(state, mainSessionKey);
+    return true;
+  }
+
+  return false;
+}
+
+export async function renameCurrentSession(state: AppViewState, newName: string): Promise<boolean> {
+  const { patchSession } = await import("./controllers/sessions.ts");
+
+  const trimmedName = newName.trim();
+  if (!trimmedName) {
+    return false;
+  }
+
+  try {
+    await patchSession(state as unknown as Parameters<typeof patchSession>[0], state.sessionKey, {
+      label: trimmedName,
+    });
+    return true;
+  } catch (err) {
+    state.lastError = `Failed to rename session: ${String(err)}`;
+    return false;
+  }
 }
 
 async function refreshSessionOptions(state: AppViewState) {

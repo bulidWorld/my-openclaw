@@ -110,6 +110,8 @@ export type AppViewState = {
   configApplying: boolean;
   updateRunning: boolean;
   applySessionKey: string;
+  chatSessionEditing: boolean;
+  chatSessionEditName: string;
   configSnapshot: ConfigSnapshot | null;
   configSchema: unknown;
   configSchemaVersion: string | null;

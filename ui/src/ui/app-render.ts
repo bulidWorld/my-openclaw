@@ -11,11 +11,11 @@ import { renderUsageTab } from "./app-render-usage-tab.ts";
 import {
   renderChatControls,
   renderChatMobileToggle,
-  renderChatSessionSelect,
   renderTab,
   renderSidebarConnectionStatus,
   renderTopbarThemeModeToggle,
   switchChatSession,
+  createNewSession,
 } from "./app-render.helpers.ts";
 import type { AppViewState } from "./app-view-state.ts";
 import { loadAgentFileContent, loadAgentFiles, saveAgentFile } from "./controllers/agent-files.ts";
@@ -89,7 +89,7 @@ import {
 import "./components/dashboard-header.ts";
 import { buildExternalLinkRel, EXTERNAL_LINK_TARGET } from "./external-link.ts";
 import { icons } from "./icons.ts";
-import { normalizeBasePath, TAB_GROUPS, subtitleForTab, titleForTab } from "./navigation.ts";
+import { normalizeBasePath, TAB_GROUPS } from "./navigation.ts";
 import { agentLogoUrl } from "./views/agents-utils.ts";
 import {
   resolveAgentConfig,
@@ -614,12 +614,8 @@ export function renderApp(state: AppViewState) {
             ? nothing
             : html`<section class="content-header">
               <div>
-                ${
-                  isChat
-                    ? renderChatSessionSelect(state)
-                    : html`<div class="page-title">${titleForTab(state.tab)}</div>`
-                }
-                ${isChat ? nothing : html`<div class="page-sub">${subtitleForTab(state.tab)}</div>`}
+                <div class="page-title">Chat</div>
+                <div class="page-sub">Message your assistant</div>
               </div>
               <div class="page-meta">
                 ${state.lastError ? html`<div class="pill danger">${state.lastError}</div>` : nothing}
@@ -1505,7 +1501,9 @@ export function renderApp(state: AppViewState) {
                 canAbort: Boolean(state.chatRunId),
                 onAbort: () => void state.handleAbortChat(),
                 onQueueRemove: (id) => state.removeQueuedMessage(id),
-                onNewSession: () => state.handleSendChat("/new", { restoreDraft: true }),
+                onNewSession: async () => {
+                  await createNewSession(state);
+                },
                 onClearHistory: async () => {
                   if (!state.client || !state.connected) {
                     return;

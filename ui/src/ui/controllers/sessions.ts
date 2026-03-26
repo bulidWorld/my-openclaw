@@ -115,6 +115,42 @@ export async function patchSession(
   }
 }
 
+export async function createSession(
+  state: SessionsState,
+  options?: {
+    agentId?: string;
+    label?: string;
+    parentSessionKey?: string;
+    model?: string;
+  },
+): Promise<string | null> {
+  if (!state.client || !state.connected) {
+    return null;
+  }
+
+  const params: Record<string, unknown> = {};
+  if (options?.agentId) {
+    params.agentId = options.agentId;
+  }
+  if (options?.label) {
+    params.label = options.label;
+  }
+  if (options?.parentSessionKey) {
+    params.parentSessionKey = options.parentSessionKey;
+  }
+  if (options?.model) {
+    params.model = options.model;
+  }
+
+  try {
+    const result = await state.client.request<{ key: string }>("sessions.create", params);
+    return result?.key ?? null;
+  } catch (err) {
+    state.sessionsError = String(err);
+    return null;
+  }
+}
+
 export async function deleteSessionsAndRefresh(
   state: SessionsState,
   keys: string[],
