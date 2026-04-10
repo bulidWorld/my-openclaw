@@ -1,5 +1,65 @@
 import type { SecretInput } from "./types.secrets.js";
 
+export type LdapUserAttributes = {
+  /** Display name attribute (default: "cn"). */
+  displayName?: string;
+  /** Email attribute (default: "mail"). */
+  email?: string;
+  /** User ID attribute (default: "uid"). */
+  userId?: string;
+};
+
+export type LdapAccessControl = {
+  /** List of allowed users (DN or uid). */
+  allowedUsers?: string[];
+  /** List of allowed groups (DN). */
+  allowedGroups?: string[];
+  /** List of denied users (DN or uid). */
+  deniedUsers?: string[];
+};
+
+export type LdapSessionConfig = {
+  /** Session timeout in milliseconds (default: 24h). */
+  timeoutMs?: number;
+  /** Enable isolated sessions per LDAP user (default: true). */
+  isolatedSessions?: boolean;
+  /** Custom session storage directory (default: ~/.openclaw/sessions/ldap/<username>). */
+  storageDir?: string;
+};
+
+export type LdapConfig = {
+  /** Enable LDAP authentication (default: false). */
+  enabled?: boolean;
+  /** LDAP server URL (e.g., "ldap://192.168.124.247:389"). */
+  url?: string;
+  /** Bind DN for LDAP admin (e.g., "cn=admin,dc=naze"). */
+  bindDN?: string;
+  /** Bind credentials/password for the admin DN. */
+  bindCredentials?: SecretInput;
+  /** Search base DN (e.g., "dc=naze"). */
+  searchBase?: string;
+  /** LDAP search filter (default: "(uid=${username})"). */
+  searchFilter?: string;
+  /** Username attribute name (default: "uid"). */
+  usernameAttribute?: string;
+  /**
+   * User DN template for direct bind (optional).
+   * If set, skips search and uses this template directly.
+   * Example: "uid=${username},ou=users,dc=naze"
+   */
+  userDnTemplate?: string;
+  /** Enable TLS for LDAP connection. */
+  tlsEnabled?: boolean;
+  /** Reject unauthorized TLS certificates (default: true). */
+  tlsRejectUnauthorized?: boolean;
+  /** User attribute mappings. */
+  userAttributes?: LdapUserAttributes;
+  /** Access control rules. */
+  accessControl?: LdapAccessControl;
+  /** Session isolation configuration. */
+  session?: LdapSessionConfig;
+};
+
 export type GatewayBindMode = "auto" | "lan" | "loopback" | "custom" | "tailnet";
 
 export type GatewayTlsConfig = {
@@ -412,6 +472,7 @@ export type GatewayConfig = {
   customBindHost?: string;
   controlUi?: GatewayControlUiConfig;
   auth?: GatewayAuthConfig;
+  ldap?: LdapConfig;
   tailscale?: GatewayTailscaleConfig;
   remote?: GatewayRemoteConfig;
   reload?: GatewayReloadConfig;

@@ -15,6 +15,7 @@ export type AgentEventPayload = {
 
 export type AgentRunContext = {
   sessionKey?: string;
+  sessionPath?: string;
   verboseLevel?: VerboseLevel;
   isHeartbeat?: boolean;
   /** Whether control UI clients should receive chat/agent updates for this run. */
@@ -49,6 +50,9 @@ export function registerAgentRunContext(runId: string, context: AgentRunContext)
   }
   if (context.sessionKey && existing.sessionKey !== context.sessionKey) {
     existing.sessionKey = context.sessionKey;
+  }
+  if (context.sessionPath && existing.sessionPath !== context.sessionPath) {
+    existing.sessionPath = context.sessionPath;
   }
   if (context.verboseLevel && existing.verboseLevel !== context.verboseLevel) {
     existing.verboseLevel = context.verboseLevel;

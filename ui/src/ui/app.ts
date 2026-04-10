@@ -122,15 +122,13 @@ export class OpenClawApp extends LitElement {
   clientInstanceId = generateUUID();
   connectGeneration = 0;
   @state() settings: UiSettings = loadSettings();
-  constructor() {
-    super();
-    if (isSupportedLocale(this.settings.locale)) {
-      void i18n.setLocale(this.settings.locale);
-    }
-  }
   @state() password = "";
+  @state() loginMethod: "token" | "ldap" = "token";
+  @state() ldapUsername = "";
+  @state() ldapPassword = "";
   @state() loginShowGatewayToken = false;
   @state() loginShowGatewayPassword = false;
+  @state() loginShowLdapPassword = false;
   @state() tab: Tab = "chat";
   @state() onboarding = resolveOnboardingMode();
   @state() connected = false;
@@ -531,6 +529,55 @@ export class OpenClawApp extends LitElement {
 
   connect() {
     connectGatewayInternal(this as unknown as Parameters<typeof connectGatewayInternal>[0]);
+  }
+
+  async connectLdap() {
+    if (!this.ldapUsername || !this.ldapPassword) {
+      this.lastError = "Username and password are required";
+      return;
+    }
+
+    this.lastError = null;
+    // LDAP login endpoint is always at the root, not under basePath
+    const loginUrl = "/api/ldap/login";
+
+    try {
+      console.log("[LDAP] Sending login request for user:", this.ldapUsername, "url:", loginUrl);
+      const response = await fetch(loginUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          username: this.ldapUsername,
+          password: this.ldapPassword,
+        }),
+      });
+
+      const result = await response.json();
+      console.log("[LDAP] Login response:", result);
+
+      if (result.ok) {
+        // Store the token and switch to token-based connection
+        this.settings.token = result.token;
+        console.log("[LDAP] Token received, length:", result.token?.length);
+        console.log("[LDAP] Calling applySettings with token");
+        this.applySettings({
+          ...this.settings,
+          token: result.token,
+        });
+        console.log("[LDAP] applySettings completed, this.settings.token:", this.settings.token?.substring(0, 20) + "...");
+        console.log("[LDAP] Calling this.connect()");
+        // Optionally switch back to token tab or proceed with connection
+        this.connect();
+      } else {
+        this.lastError = result.reason || "LDAP authentication failed";
+        console.log("[LDAP] Login failed:", result.reason);
+      }
+    } catch (err) {
+      console.error("[LDAP] Login error:", err);
+      this.lastError = "Failed to connect to LDAP server";
+    }
   }
 
   handleChatScroll(event: Event) {

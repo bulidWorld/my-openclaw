@@ -8,7 +8,7 @@ import { getLatestSubagentRunByChildSessionKey } from "../agents/subagent-regist
 import { loadConfig } from "../config/config.js";
 import type { AuthRateLimiter } from "./auth-rate-limit.js";
 import { isLocalDirectRequest, type ResolvedGatewayAuth } from "./auth.js";
-import { authorizeGatewayBearerRequestOrReply } from "./http-auth-helpers.js";
+import { authorizeGatewayBearerRequestOrReply, getSessionPathFromRequest } from "./http-auth-helpers.js";
 import { sendJson, sendMethodNotAllowed } from "./http-common.js";
 import { getBearerToken } from "./http-utils.js";
 import { ADMIN_SCOPE, WRITE_SCOPE, authorizeOperatorScopesForMethod } from "./method-scopes.js";
@@ -78,7 +78,9 @@ export async function handleSessionKillHttpRequest(
     return true;
   }
 
-  const { entry, canonicalKey } = loadSessionEntry(sessionKey);
+  // Get sessionPath from LDAP auth context (per-user session isolation)
+  const sessionPath = getSessionPathFromRequest(req);
+  const { entry, canonicalKey } = loadSessionEntry(sessionKey, sessionPath);
   if (!entry) {
     sendJson(res, 404, {
       ok: false,

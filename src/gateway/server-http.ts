@@ -784,12 +784,14 @@ export function createGatewayHttpServer(opts: {
       });
 
   async function handleRequest(req: IncomingMessage, res: ServerResponse) {
+    console.log("[server-http] handleRequest:", req.method, req.url);
     setDefaultSecurityHeaders(res, {
       strictTransportSecurity: strictTransportSecurityHeader,
     });
 
     // Don't interfere with WebSocket upgrades; ws handles the 'upgrade' event.
     if (String(req.headers.upgrade ?? "").toLowerCase() === "websocket") {
+      console.log("[server-http] skipping websocket upgrade request");
       return;
     }
 
@@ -963,12 +965,14 @@ export function createGatewayHttpServer(opts: {
         });
         requestStages.push({
           name: "control-ui-http",
-          run: () =>
-            handleControlUiHttpRequest(req, res, {
+          run: () => {
+            console.log("[server-http] calling handleControlUiHttpRequest, basePath:", controlUiBasePath, "url:", req.url);
+            return handleControlUiHttpRequest(req, res, {
               basePath: controlUiBasePath,
               config: configSnapshot,
               root: controlUiRoot,
-            }),
+            });
+          },
         });
       }
 

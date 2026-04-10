@@ -161,5 +161,6 @@ export default defineConfig([
     deps: {
       neverBundle: ["@lancedb/lancedb"],
     },
+    sourcemap: true
   }),
 ]);

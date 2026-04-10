@@ -28,6 +28,7 @@ import { resolveRuntimeServiceVersion } from "../../../version.js";
 import type { AuthRateLimiter } from "../../auth-rate-limit.js";
 import type { GatewayAuthResult, ResolvedGatewayAuth } from "../../auth.js";
 import { isLocalDirectRequest } from "../../auth.js";
+import { setConnectionSessionPath, getConnectionSessionPath } from "../../session-path-context.js";
 import {
   buildCanvasScopedHostUrl,
   CANVAS_CAPABILITY_TTL_MS,
@@ -1055,6 +1056,14 @@ export function attachGatewayWsMessageHandler(params: {
         };
 
         clearHandshakeTimer();
+        logWsControl.info("WebSocket handshake completed", {
+          authResult: {
+            sessionPath: authResult.sessionPath,
+            user: authResult.user,
+            method: authResult.method
+          },
+          connId
+        });
         const nextClient: GatewayWsClient = {
           socket,
           connect: connectParams,
@@ -1064,10 +1073,20 @@ export function attachGatewayWsMessageHandler(params: {
           canvasHostUrl,
           canvasCapability,
           canvasCapabilityExpiresAtMs,
+          sessionPath: authResult.sessionPath,
         };
         setSocketMaxPayload(socket, MAX_PAYLOAD_BYTES);
         setClient(nextClient);
         setHandshakeState("connected");
+        // Register session path for LDAP users
+        if (authResult.sessionPath) {
+          logWsControl.debug([connId, authResult.sessionPath].join("::::"))
+          logWsControl.debug("setting connection session path", { connId, sessionPath: authResult.sessionPath });
+          setConnectionSessionPath(connId, authResult.sessionPath);
+          logWsControl.debug("connection session path set complete");
+        } else {
+          logWsControl.debug("no sessionPath in authResult, skipping setConnectionSessionPath");
+        }
         if (role === "node") {
           const context = buildRequestContext();
           const nodeSession = context.nodeRegistry.register(nextClient, {
@@ -1127,7 +1146,8 @@ export function attachGatewayWsMessageHandler(params: {
         });
 
         send({ type: "res", id: frame.id, ok: true, payload: helloOk });
-        void refreshGatewayHealthSnapshot({ probe: true }).catch((err) =>
+        const sessionPath = getConnectionSessionPath(connId);
+        void refreshGatewayHealthSnapshot({ probe: true, sessionPath }).catch((err) =>
           logHealth.error(`post-connect health refresh failed: ${formatError(err)}`),
         );
         return;

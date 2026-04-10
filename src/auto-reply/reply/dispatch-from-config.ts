@@ -123,11 +123,12 @@ const resolveSessionStoreLookup = (
   const targetSessionKey =
     ctx.CommandSource === "native" ? ctx.CommandTargetSessionKey?.trim() : undefined;
   const sessionKey = (targetSessionKey ?? ctx.SessionKey)?.trim();
+  const sessionPath = ctx.SessionPath?.trim();
   if (!sessionKey) {
     return {};
   }
   const agentId = resolveSessionAgentId({ sessionKey, config: cfg });
-  const storePath = resolveStorePath(cfg.session?.store, { agentId });
+  const storePath = resolveStorePath(cfg.session?.store, { agentId, sessionPath });
   try {
     const store = loadSessionStore(storePath);
     return {

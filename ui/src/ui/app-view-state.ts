@@ -40,8 +40,12 @@ import type { SessionLogEntry } from "./views/usage.ts";
 export type AppViewState = {
   settings: UiSettings;
   password: string;
+  loginMethod: "token" | "ldap";
+  ldapUsername: string;
+  ldapPassword: string;
   loginShowGatewayToken: boolean;
   loginShowGatewayPassword: boolean;
+  loginShowLdapPassword: boolean;
   tab: Tab;
   onboarding: boolean;
   basePath: string;

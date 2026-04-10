@@ -381,7 +381,7 @@ export const usageHandlers: GatewayRequestHandlers = {
     const summary = await loadCostUsageSummaryCached({ startMs, endMs, config });
     respond(true, summary, undefined);
   },
-  "sessions.usage": async ({ respond, params }) => {
+  "sessions.usage": async ({ respond, params, client }) => {
     if (!validateSessionsUsageParams(params)) {
       respond(
         false,
@@ -396,6 +396,7 @@ export const usageHandlers: GatewayRequestHandlers = {
 
     const p = params;
     const config = loadConfig();
+    const sessionPath = client?.sessionPath;
     const { startMs, endMs } = parseDateRange({
       startDate: p.startDate,
       endDate: p.endDate,
@@ -407,7 +408,7 @@ export const usageHandlers: GatewayRequestHandlers = {
     const specificKey = typeof p.key === "string" ? p.key.trim() : null;
 
     // Load session store for named sessions
-    const { storePath, store } = loadCombinedSessionStoreForGateway(config);
+    const { storePath, store } = loadCombinedSessionStoreForGateway(config, sessionPath);
     const now = Date.now();
 
     // Merge discovered sessions with store entries

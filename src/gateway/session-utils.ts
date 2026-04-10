@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { createSubsystemLogger } from "../logging/subsystem.js";
 import { resolveAgentWorkspaceDir, resolveDefaultAgentId } from "../agents/agent-scope.js";
 import { lookupContextTokens, resolveContextTokensForModel } from "../agents/context.js";
 import { DEFAULT_CONTEXT_TOKENS, DEFAULT_MODEL, DEFAULT_PROVIDER } from "../agents/defaults.js";
@@ -48,6 +49,8 @@ import {
 } from "../shared/avatar-policy.js";
 import { normalizeSessionDeliveryFields } from "../utils/delivery-context.js";
 import { estimateUsageCost, resolveModelCostConfig } from "../utils/usage-format.js";
+
+const log = createSubsystemLogger("gateway/session-utils");
 import {
   readLatestSessionUsageFromTranscript,
   readSessionTitleFieldsFromTranscript,
@@ -353,7 +356,12 @@ function resolveTranscriptUsageFallback(params: {
   };
 }
 
-export function loadSessionEntry(sessionKey: string) {
+export function loadSessionEntry(sessionKey: string, sessionPath?: string) {
+  console.log("[loadSessionEntry] called", {
+    sessionKey,
+    sessionPath,
+    stack: new Error().stack?.split("\n").slice(1, 21).join("\n")
+  });
   const cfg = loadConfig();
   const canonicalKey = resolveSessionStoreKey({ cfg, sessionKey });
   const agentId = resolveSessionStoreAgentId(cfg, canonicalKey);
@@ -362,11 +370,13 @@ export function loadSessionEntry(sessionKey: string) {
     key: sessionKey.trim(),
     canonicalKey,
     agentId,
+    sessionPath,
   });
   const target = resolveGatewaySessionStoreTarget({
     cfg,
     key: sessionKey.trim(),
     store,
+    sessionPath,
   });
   const freshestMatch = resolveFreshestSessionStoreMatchFromStoreKeys(store, target.storeKeys);
   const legacyKey = freshestMatch?.key !== canonicalKey ? freshestMatch?.key : undefined;
@@ -740,11 +750,22 @@ function buildGatewaySessionStoreScanTargets(params: {
 function resolveGatewaySessionStoreCandidates(
   cfg: OpenClawConfig,
   agentId: string,
+  sessionPath?: string,
 ): SessionStoreTarget[] {
   const storeConfig = cfg.session?.store;
+
+  // When sessionPath is provided (e.g., LDAP user with isolated sessions),
+  // only return that specific store for session isolation
+  if (sessionPath && sessionPath.trim()) {
+    return [{
+      agentId,
+      storePath: resolveStorePath(storeConfig, { agentId, sessionPath }),
+    }];
+  }
+
   const defaultTarget = {
     agentId,
-    storePath: resolveStorePath(storeConfig, { agentId }),
+    storePath: resolveStorePath(storeConfig, { agentId, sessionPath }),
   };
   if (!isStorePathTemplate(storeConfig)) {
     return [defaultTarget];
@@ -764,18 +785,29 @@ function resolveGatewaySessionStoreLookup(params: {
   key: string;
   canonicalKey: string;
   agentId: string;
+  sessionPath?: string;
   initialStore?: Record<string, SessionEntry>;
 }): {
   storePath: string;
   store: Record<string, SessionEntry>;
   match: { entry: SessionEntry; key: string } | undefined;
 } {
+  log.debug("resolveGatewaySessionStoreLookup called", {
+    sessionPath: params.sessionPath,
+    agentId: params.agentId,
+    key: params.key
+  });
   const scanTargets = buildGatewaySessionStoreScanTargets(params);
-  const candidates = resolveGatewaySessionStoreCandidates(params.cfg, params.agentId);
+  const candidates = resolveGatewaySessionStoreCandidates(params.cfg, params.agentId, params.sessionPath);
+  log.debug("resolveGatewaySessionStoreCandidates result", {
+    candidatesCount: candidates.length,
+    fallbackStorePath: candidates[0]?.storePath
+  });
   const fallback = candidates[0] ?? {
     agentId: params.agentId,
-    storePath: resolveStorePath(params.cfg.session?.store, { agentId: params.agentId }),
+    storePath: resolveStorePath(params.cfg.session?.store, { agentId: params.agentId, sessionPath: params.sessionPath }),
   };
+  log.debug("fallback storePath", { storePath: fallback.storePath });
   let selectedStorePath = fallback.storePath;
   let selectedStore = params.initialStore ?? loadSessionStore(fallback.storePath);
   let selectedMatch = findStoreMatch(selectedStore, ...scanTargets);
@@ -814,25 +846,34 @@ export function resolveGatewaySessionStoreTarget(params: {
   key: string;
   scanLegacyKeys?: boolean;
   store?: Record<string, SessionEntry>;
+  sessionPath?: string;
 }): {
   agentId: string;
   storePath: string;
   canonicalKey: string;
   storeKeys: string[];
 } {
+  log.debug("resolveGatewaySessionStoreTarget called", {
+    key: params.key,
+    sessionPath: params.sessionPath
+  });
   const key = params.key.trim();
   const canonicalKey = resolveSessionStoreKey({
     cfg: params.cfg,
     sessionKey: key,
   });
+  log.debug("canonicalKey resolved", { canonicalKey });
   const agentId = resolveSessionStoreAgentId(params.cfg, canonicalKey);
+  log.debug("agentId resolved", { agentId });
   const { storePath, store } = resolveGatewaySessionStoreLookup({
     cfg: params.cfg,
     key,
     canonicalKey,
     agentId,
+    sessionPath: params.sessionPath,
     initialStore: params.store,
   });
+  log.debug("storePath resolved", { storePath });
 
   if (canonicalKey === "global" || canonicalKey === "unknown") {
     const storeKeys = key && key !== canonicalKey ? [canonicalKey, key] : [key];
@@ -846,7 +887,7 @@ export function resolveGatewaySessionStoreTarget(params: {
   }
   if (params.scanLegacyKeys !== false) {
     // Scan the on-disk store for case variants of every target to find
-    // legacy mixed-case entries (e.g. "agent:ops:MAIN" when canonical is "agent:ops:work").
+    // legacy mixed-case entries (for example, "agent:ops:MAIN" when canonical is "agent:ops:work").
     const scanTargets = buildGatewaySessionStoreScanTargets({
       cfg: params.cfg,
       key,
@@ -897,13 +938,30 @@ function mergeSessionEntryIntoCombined(params: {
   }
 }
 
-export function loadCombinedSessionStoreForGateway(cfg: OpenClawConfig): {
+export function loadCombinedSessionStoreForGateway(
+  cfg: OpenClawConfig,
+  sessionPath?: string,
+): {
   storePath: string;
   store: Record<string, SessionEntry>;
 } {
   const storeConfig = cfg.session?.store;
+  console.log("[loadCombinedSessionStoreForGateway] called", {
+    sessionPath,
+    storeConfig: typeof storeConfig === "string" ? storeConfig : "object/undefined",
+    stack: new Error().stack?.split("\n").slice(1, 21).join("\n")
+  });
+
+  // When sessionPath is provided (e.g., LDAP user), load only that specific store
+  // and do not merge with other agent stores for session isolation
+  if (sessionPath && sessionPath.trim()) {
+    const storePath = resolveStorePath(storeConfig, { sessionPath });
+    const store = loadSessionStore(storePath);
+    return { storePath, store };
+  }
+
   if (storeConfig && !isStorePathTemplate(storeConfig)) {
-    const storePath = resolveStorePath(storeConfig);
+    const storePath = resolveStorePath(storeConfig, { sessionPath });
     const defaultAgentId = normalizeAgentId(resolveDefaultAgentId(cfg));
     const store = loadSessionStore(storePath);
     const combined: Record<string, SessionEntry> = {};
@@ -1230,9 +1288,10 @@ export function buildGatewaySessionRow(params: {
 
 export function loadGatewaySessionRow(
   sessionKey: string,
+  sessionPath?: string,
   options?: { includeDerivedTitles?: boolean; includeLastMessage?: boolean; now?: number },
 ): GatewaySessionRow | null {
-  const { cfg, storePath, store, entry, canonicalKey } = loadSessionEntry(sessionKey);
+  const { cfg, storePath, store, entry, canonicalKey } = loadSessionEntry(sessionKey, sessionPath);
   if (!entry) {
     return null;
   }

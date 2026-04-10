@@ -5,7 +5,6 @@ import type { ChatRunEntry } from "./server-chat.js";
 import {
   DEDUPE_MAX,
   DEDUPE_TTL_MS,
-  HEALTH_REFRESH_INTERVAL_MS,
   TICK_INTERVAL_MS,
 } from "./server-constants.js";
 import type { DedupeEntry } from "./server-shared.js";
@@ -64,16 +63,18 @@ export function startGatewayMaintenanceTimers(params: {
   }, TICK_INTERVAL_MS);
 
   // periodic health refresh to keep cached snapshot warm
-  const healthInterval = setInterval(() => {
-    void params
-      .refreshGatewayHealthSnapshot({ probe: true })
-      .catch((err) => params.logHealth.error(`refresh failed: ${formatError(err)}`));
-  }, HEALTH_REFRESH_INTERVAL_MS);
+  // Disabled for LDAP user isolation - each user should trigger their own health refresh
+  // with their specific sessionPath instead of using a shared global cache.
+  // const healthInterval = setInterval(() => {
+  //   void params
+  //     .refreshGatewayHealthSnapshot({ probe: true })
+  //     .catch((err) => params.logHealth.error(`refresh failed: ${formatError(err)}`));
+  // }, HEALTH_REFRESH_INTERVAL_MS);
 
-  // Prime cache so first client gets a snapshot without waiting.
-  void params
-    .refreshGatewayHealthSnapshot({ probe: true })
-    .catch((err) => params.logHealth.error(`initial refresh failed: ${formatError(err)}`));
+  // Prime cache on startup - disabled for LDAP user isolation
+  // void params
+  //   .refreshGatewayHealthSnapshot({ probe: true })
+  //   .catch((err) => params.logHealth.error(`initial refresh failed: ${formatError(err)}`));
 
   // dedupe cache cleanup
   const dedupeCleanup = setInterval(() => {
@@ -152,6 +153,9 @@ export function startGatewayMaintenanceTimers(params: {
       params.chatDeltaLastBroadcastLen.delete(runId);
     }
   }, 60_000);
+
+  // healthInterval is disabled for LDAP user isolation
+  const healthInterval = null as unknown as ReturnType<typeof setInterval>;
 
   if (typeof params.mediaCleanupTtlMs !== "number") {
     return { tickInterval, healthInterval, dedupeCleanup, mediaCleanup: null };

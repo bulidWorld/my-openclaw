@@ -54,13 +54,39 @@ export function clearSessionTranscriptKeyCacheForTests(): void {
   TRANSCRIPT_SESSION_KEY_CACHE.clear();
 }
 
-export function resolveSessionKeyForTranscriptFile(sessionFile: string): string | undefined {
+export function resolveSessionKeyForTranscriptFile(
+  sessionFile: string,
+  sessionPath?: string,
+): string | undefined {
   const targetPath = resolveTranscriptPathForComparison(sessionFile);
   if (!targetPath) {
     return undefined;
   }
   const cfg = loadConfig();
-  const { store } = loadCombinedSessionStoreForGateway(cfg);
+
+  // When sessionPath is provided (e.g., LDAP user), only search within that store
+  // for session isolation
+  if (sessionPath && sessionPath.trim()) {
+    const { store } = loadCombinedSessionStoreForGateway(cfg, sessionPath);
+    for (const [key, entry] of Object.entries(store)) {
+      if (!entry?.sessionId) {
+        continue;
+      }
+      if (
+        sessionKeyMatchesTranscriptPath({
+          cfg,
+          store,
+          key,
+          targetPath,
+        })
+      ) {
+        return key;
+      }
+    }
+    return undefined;
+  }
+
+  const { store } = loadCombinedSessionStoreForGateway(cfg, sessionPath);
 
   const cachedKey = TRANSCRIPT_SESSION_KEY_CACHE.get(targetPath);
   if (

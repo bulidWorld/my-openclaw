@@ -6,7 +6,7 @@ import { loadSessionStore } from "../config/sessions.js";
 import { onSessionTranscriptUpdate } from "../sessions/transcript-events.js";
 import type { AuthRateLimiter } from "./auth-rate-limit.js";
 import type { ResolvedGatewayAuth } from "./auth.js";
-import { authorizeGatewayBearerRequestOrReply } from "./http-auth-helpers.js";
+import { authorizeGatewayBearerRequestOrReply, getSessionPathFromRequest } from "./http-auth-helpers.js";
 import {
   sendInvalidRequest,
   sendJson,
@@ -167,7 +167,9 @@ export async function handleSessionHistoryHttpRequest(
     return true;
   }
 
-  const target = resolveGatewaySessionStoreTarget({ cfg, key: sessionKey });
+  // Get sessionPath from LDAP auth context (per-user session isolation)
+  const sessionPath = getSessionPathFromRequest(req);
+  const target = resolveGatewaySessionStoreTarget({ cfg, key: sessionKey, sessionPath });
   const store = loadSessionStore(target.storePath);
   const entry = resolveFreshestSessionEntryFromStoreKeys(store, target.storeKeys);
   if (!entry?.sessionId) {

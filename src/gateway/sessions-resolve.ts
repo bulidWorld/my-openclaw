@@ -19,8 +19,9 @@ export type SessionsResolveResult = { ok: true; key: string } | { ok: false; err
 export async function resolveSessionKeyFromResolveParams(params: {
   cfg: OpenClawConfig;
   p: SessionsResolveParams;
+  sessionPath?: string;
 }): Promise<SessionsResolveResult> {
-  const { cfg, p } = params;
+  const { cfg, p, sessionPath } = params;
 
   const key = typeof p.key === "string" ? p.key.trim() : "";
   const hasKey = key.length > 0;
@@ -45,7 +46,7 @@ export async function resolveSessionKeyFromResolveParams(params: {
   }
 
   if (hasKey) {
-    const target = resolveGatewaySessionStoreTarget({ cfg, key });
+    const target = resolveGatewaySessionStoreTarget({ cfg, key, sessionPath });
     const store = loadSessionStore(target.storePath);
     if (store[target.canonicalKey]) {
       if (typeof p.spawnedBy === "string" && p.spawnedBy.trim().length > 0) {
@@ -105,7 +106,7 @@ export async function resolveSessionKeyFromResolveParams(params: {
   }
 
   if (hasSessionId) {
-    const { storePath, store } = loadCombinedSessionStoreForGateway(cfg);
+    const { storePath, store } = loadCombinedSessionStoreForGateway(cfg, sessionPath);
     const list = listSessionsFromStore({
       cfg,
       storePath,
@@ -147,7 +148,7 @@ export async function resolveSessionKeyFromResolveParams(params: {
     };
   }
 
-  const { storePath, store } = loadCombinedSessionStoreForGateway(cfg);
+  const { storePath, store } = loadCombinedSessionStoreForGateway(cfg, sessionPath);
   const list = listSessionsFromStore({
     cfg,
     storePath,

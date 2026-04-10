@@ -91,8 +91,12 @@ export async function resolveConnectAuthState(params: {
   rateLimiter?: AuthRateLimiter;
   clientIp?: string;
 }): Promise<ConnectAuthState> {
+  console.log("[auth-context] resolveConnectAuthState called");
+  console.log("[auth-context] connectAuth keys:", params.connectAuth ? Object.keys(params.connectAuth).join(", ") : "null");
+  console.log("[auth-context] connectAuth.token:", params.connectAuth?.token ? "present (length: " + params.connectAuth.token.length + ")" : "missing");
   const sharedConnectAuth = resolveSharedConnectAuth(params.connectAuth);
   const sharedAuthProvided = Boolean(sharedConnectAuth);
+  console.log("[auth-context] sharedConnectAuth:", sharedConnectAuth ? "present" : "null", "sharedAuthProvided:", sharedAuthProvided);
   const bootstrapTokenCandidate = params.hasDeviceIdentity
     ? resolveBootstrapTokenCandidate(params.connectAuth)
     : undefined;
@@ -110,6 +114,7 @@ export async function resolveConnectAuthState(params: {
     clientIp: params.clientIp,
     rateLimitScope: AUTH_RATE_LIMIT_SCOPE_SHARED_SECRET,
   });
+  console.log("[auth-context] authorizeWsControlUiGatewayConnect result:", authResult.ok ? "ok" : "failed", "method:", authResult.method, "user:", authResult.user, "sessionPath:", authResult.sessionPath);
 
   if (
     hasDeviceTokenCandidate &&
@@ -153,6 +158,7 @@ export async function resolveConnectAuthState(params: {
       (sharedAuthResult.method === "token" || sharedAuthResult.method === "password")) ||
     (authResult.ok && authResult.method === "trusted-proxy");
 
+  console.log("[auth-context] resolveConnectAuthState returning authOk:", authResult.ok, "authMethod:", authResult.method, "sessionPath:", authResult.sessionPath);
   return {
     authResult,
     authOk: authResult.ok,

@@ -215,6 +215,7 @@ export async function getReplyFromConfig(
     systemSent,
     abortedLastRun,
     storePath,
+    sessionPath,
     sessionScope,
     groupResolution,
     isGroup,
@@ -450,6 +451,7 @@ export async function getReplyFromConfig(
     sessionKey,
     sessionId,
     storePath,
+    sessionPath,
     workspaceDir,
     abortedLastRun,
   });

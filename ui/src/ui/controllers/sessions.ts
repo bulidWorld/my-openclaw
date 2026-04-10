@@ -18,11 +18,66 @@ export type SessionsState = {
   sessionsIncludeUnknown: boolean;
 };
 
+/**
+ * After loading sessions, ensure there is an active session:
+ * - If the current sessionKey is still valid, keep it
+ * - If there are existing sessions but current sessionKey is not valid, select the most recent one
+ * - If there are no sessions, create a new blank session
+ */
+export async function ensureActiveSessionAfterLoad(
+  state: SessionsState & {
+    sessionKey: string;
+    settings: { lastActiveSessionKey: string };
+  },
+  overrides?: {
+    activeMinutes?: number;
+    limit?: number;
+    includeGlobal?: boolean;
+    includeUnknown?: boolean;
+  },
+) {
+  await loadSessions(state, overrides);
+
+  const sessions = state.sessionsResult?.sessions;
+  if (!sessions || sessions.length === 0) {
+    // No existing sessions - create a new blank session
+    const newSessionKey = await createSession(state);
+    if (newSessionKey) {
+      state.sessionKey = newSessionKey;
+      state.settings.lastActiveSessionKey = newSessionKey;
+    }
+    return;
+  }
+
+  // Check if the current sessionKey is still valid in the loaded sessions
+  const currentSessionStillValid = sessions.some((s) => s.key === state.sessionKey);
+
+  if (currentSessionStillValid) {
+    // Keep the current sessionKey - user was viewing this session before refresh
+    return;
+  }
+
+  // Current sessionKey is not valid, try to restore from lastActiveSessionKey
+  const lastActiveSession = sessions.find((s) => s.key === state.settings.lastActiveSessionKey);
+  if (lastActiveSession?.key) {
+    state.sessionKey = lastActiveSession.key;
+    return;
+  }
+
+  // Fall back to the most recent session
+  const mostRecent = sessions[0];
+  if (mostRecent?.key && mostRecent.key !== state.sessionKey) {
+    state.sessionKey = mostRecent.key;
+    state.settings.lastActiveSessionKey = mostRecent.key;
+  }
+}
+
 export async function subscribeSessions(state: SessionsState) {
   if (!state.client || !state.connected) {
     return;
   }
   try {
+    console.log("[frontend] calling sessions.subscribe")
     await state.client.request("sessions.subscribe", {});
   } catch (err) {
     state.sessionsError = String(err);
@@ -62,6 +117,7 @@ export async function loadSessions(
       params.limit = limit;
     }
     const res = await state.client.request<SessionsListResult | undefined>("sessions.list", params);
+    console.log("[frontend] sessions.list returned", { sessionCount: res?.sessions?.length })
     if (res) {
       state.sessionsResult = res;
     }

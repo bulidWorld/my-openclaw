@@ -7,7 +7,7 @@ import { executeSlashCommand } from "./chat/slash-command-executor.ts";
 import { parseSlashCommand } from "./chat/slash-commands.ts";
 import { abortChatRun, loadChatHistory, sendChatMessage } from "./controllers/chat.ts";
 import { loadModels } from "./controllers/models.ts";
-import { loadSessions } from "./controllers/sessions.ts";
+import { loadSessions, ensureActiveSessionAfterLoad } from "./controllers/sessions.ts";
 import type { GatewayBrowserClient, GatewayHelloOk } from "./gateway.ts";
 import { normalizeBasePath } from "./navigation.ts";
 import type { ChatModelOverride, ModelCatalogEntry } from "./types.ts";
@@ -356,14 +356,15 @@ function injectCommandResult(host: ChatHost, content: string) {
 }
 
 export async function refreshChat(host: ChatHost, opts?: { scheduleScroll?: boolean }) {
+  // Load sessions and ensure there's an active session selected
+  await ensureActiveSessionAfterLoad(host as unknown as OpenClawApp, {
+    activeMinutes: 0,
+    limit: 0,
+    includeGlobal: true,
+    includeUnknown: true,
+  });
   await Promise.all([
     loadChatHistory(host as unknown as OpenClawApp),
-    loadSessions(host as unknown as OpenClawApp, {
-      activeMinutes: 0,
-      limit: 0,
-      includeGlobal: true,
-      includeUnknown: true,
-    }),
     refreshChatAvatar(host),
     refreshChatModels(host),
   ]);

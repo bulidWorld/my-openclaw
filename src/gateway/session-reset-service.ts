@@ -254,16 +254,17 @@ export async function performGatewaySessionReset(params: {
   key: string;
   reason: "new" | "reset";
   commandSource: string;
+  sessionPath?: string;
 }): Promise<
   | { ok: true; key: string; entry: SessionEntry }
   | { ok: false; error: ReturnType<typeof errorShape> }
 > {
   const { cfg, target, storePath } = (() => {
     const cfg = loadConfig();
-    const target = resolveGatewaySessionStoreTarget({ cfg, key: params.key });
+    const target = resolveGatewaySessionStoreTarget({ cfg, key: params.key, sessionPath: params.sessionPath });
     return { cfg, target, storePath: target.storePath };
   })();
-  const { entry, legacyKey, canonicalKey } = loadSessionEntry(params.key);
+  const { entry, legacyKey, canonicalKey } = loadSessionEntry(params.key, params.sessionPath);
   const hadExistingEntry = Boolean(entry);
   const hookEvent = createInternalHookEvent(
     "command",

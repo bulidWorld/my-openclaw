@@ -1,5 +1,6 @@
 import { updateSessionStoreEntry, type SessionEntry } from "../config/sessions.js";
 import type { AgentEventPayload } from "../infra/agent-events.js";
+import { getAgentRunContext } from "../infra/agent-events.js";
 import { loadSessionEntry } from "./session-utils.js";
 import type { GatewaySessionRow, SessionRunStatus } from "./session-utils.types.js";
 
@@ -152,7 +153,11 @@ export async function persistGatewaySessionLifecycleEvent(params: {
     return;
   }
 
-  const sessionEntry = loadSessionEntry(params.sessionKey);
+  // Try to get sessionPath from agent run context for LDAP user isolation
+  const runContext = params.event.runId ? getAgentRunContext(params.event.runId) : undefined;
+  const sessionPath = runContext?.sessionPath;
+
+  const sessionEntry = loadSessionEntry(params.sessionKey, sessionPath);
   if (!sessionEntry.entry) {
     return;
   }

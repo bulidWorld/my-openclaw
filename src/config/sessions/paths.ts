@@ -278,13 +278,22 @@ export function resolveSessionFilePath(
 
 export function resolveStorePath(
   store?: string,
-  opts?: { agentId?: string; env?: NodeJS.ProcessEnv },
+  opts?: { agentId?: string; env?: NodeJS.ProcessEnv; sessionPath?: string },
 ) {
   const agentId = normalizeAgentId(opts?.agentId ?? DEFAULT_AGENT_ID);
   const env = opts?.env ?? process.env;
+  const sessionPath = opts?.sessionPath;
   const homedir = () => resolveRequiredHomeDir(env, os.homedir);
+
+  // sessionPath has higher priority than store config (for LDAP user isolation)
+  if (sessionPath) {
+    const baseDir = path.join(resolveStateDir(env, homedir), "sessions", sessionPath);
+    return path.join(baseDir, "sessions.json");
+  }
+
   if (!store) {
-    return path.join(resolveAgentSessionsDir(agentId, env, homedir), "sessions.json");
+    const baseDir = resolveAgentSessionsDir(agentId, env, homedir);
+    return path.join(baseDir, "sessions.json");
   }
   if (store.includes("{agentId}")) {
     const expanded = store.replaceAll("{agentId}", agentId);

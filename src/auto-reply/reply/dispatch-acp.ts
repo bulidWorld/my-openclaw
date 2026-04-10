@@ -190,6 +190,7 @@ export type AcpDispatchAttemptResult = {
 async function finalizeAcpTurnOutput(params: {
   cfg: OpenClawConfig;
   sessionKey: string;
+  sessionPath?: string;
   delivery: AcpDispatchDeliveryCoordinator;
   inboundAudio: boolean;
   sessionTtsAuto?: TtsAutoMode;
@@ -247,6 +248,7 @@ async function finalizeAcpTurnOutput(params: {
     const currentMeta = readAcpSessionEntry({
       cfg: params.cfg,
       sessionKey: params.sessionKey,
+      sessionPath: params.sessionPath,
     })?.acp;
     const identityAfterTurn = resolveSessionIdentityFromMeta(currentMeta);
     if (!isSessionIdentityPending(identityAfterTurn)) {
@@ -285,6 +287,7 @@ export async function tryDispatchAcpReply(params: {
   markIdle: (reason: string) => void;
 }): Promise<AcpDispatchAttemptResult | null> {
   const sessionKey = params.sessionKey?.trim();
+  const sessionPath = params.ctx.SessionPath?.trim();
   if (!sessionKey || params.bypassForCommand) {
     return null;
   }
@@ -293,6 +296,7 @@ export async function tryDispatchAcpReply(params: {
   const acpResolution = acpManager.resolveSession({
     cfg: params.cfg,
     sessionKey,
+    sessionPath,
   });
   if (acpResolution.kind === "none") {
     return null;
@@ -400,6 +404,7 @@ export async function tryDispatchAcpReply(params: {
       (await finalizeAcpTurnOutput({
         cfg: params.cfg,
         sessionKey,
+        sessionPath: params.ctx.SessionPath?.trim(),
         delivery,
         inboundAudio: params.inboundAudio,
         sessionTtsAuto: params.sessionTtsAuto,

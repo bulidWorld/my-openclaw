@@ -64,6 +64,7 @@ export type SessionInitResult = {
   systemSent: boolean;
   abortedLastRun: boolean;
   storePath: string;
+  sessionPath?: string;
   sessionScope: SessionScope;
   groupResolution?: GroupKeyResolution;
   isGroup: boolean;
@@ -192,7 +193,7 @@ export async function initSessionState(params: {
     : DEFAULT_RESET_TRIGGERS;
   const parentForkMaxTokens = resolveParentForkMaxTokens(cfg);
   const sessionScope = sessionCfg?.scope ?? "per-sender";
-  const storePath = resolveStorePath(sessionCfg?.store, { agentId });
+  const storePath = resolveStorePath(sessionCfg?.store, { agentId, sessionPath: ctx.SessionPath });
   const ingressTimingEnabled = process.env.OPENCLAW_DEBUG_INGRESS_TIMING === "1";
 
   // CRITICAL: Skip cache to ensure fresh data when resolving session identity.
@@ -637,6 +638,7 @@ export async function initSessionState(params: {
     systemSent,
     abortedLastRun,
     storePath,
+    sessionPath: ctx.SessionPath,
     sessionScope,
     groupResolution,
     isGroup,

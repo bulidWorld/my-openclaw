@@ -1,4 +1,7 @@
 import type { IncomingMessage } from "node:http";
+import { createSubsystemLogger } from "../logging/subsystem.js";
+
+const log = createSubsystemLogger("gateway/auth");
 import type {
   GatewayAuthConfig,
   GatewayTailscaleMode,
@@ -47,13 +50,16 @@ export type GatewayAuthResult = {
     | "tailscale"
     | "device-token"
     | "bootstrap-token"
-    | "trusted-proxy";
+    | "trusted-proxy"
+    | "ldap-token";
   user?: string;
   reason?: string;
   /** Present when the request was blocked by the rate limiter. */
   rateLimited?: boolean;
   /** Milliseconds the client should wait before retrying (when rate-limited). */
   retryAfterMs?: number;
+  /** Session path for LDAP users (isolated sessions). */
+  sessionPath?: string;
 };
 
 type ConnectAuth = {
@@ -94,6 +100,39 @@ type TailscaleWhoisLookup = (ip: string) => Promise<TailscaleWhoisIdentity | nul
 
 function normalizeLogin(login: string): string {
   return login.trim().toLowerCase();
+}
+
+/**
+ * Try to verify an LDAP-style token (base64-encoded JSON with method: "ldap")
+ */
+function tryVerifyLdapToken(token: string): { ok: true; user: string; sessionPath?: string } | { ok: false } {
+  log.debug("tryVerifyLdapToken called", { tokenLength: token.length });
+  try {
+    // LDAP tokens are base64-encoded JSON
+    const decoded = Buffer.from(token, "base64").toString("utf-8");
+    log.debug("LDAP token decoded", { decoded });
+    const parsed = JSON.parse(decoded);
+    log.debug("LDAP token parsed", parsed);
+
+    // Check if it's a valid LDAP token structure
+    if (parsed && typeof parsed === "object" &&
+        parsed.method === "ldap" &&
+        typeof parsed.user === "string" &&
+        typeof parsed.timestamp === "number") {
+      log.info("LDAP token valid", { user: parsed.user, sessionPath: parsed.sessionPath });
+      return {
+        ok: true,
+        user: parsed.user,
+        sessionPath: parsed.sessionPath,
+      };
+    }
+
+    log.debug("LDAP token invalid structure");
+    return { ok: false };
+  } catch (err) {
+    log.debug("LDAP token parse error", { error: err instanceof Error ? err.message : String(err) });
+    return { ok: false };
+  }
 }
 
 function headerValue(value: string | string[] | undefined): string | undefined {
@@ -445,12 +484,32 @@ export async function authorizeGatewayConnect(
       // Only actual *wrong* credentials should count as failures.
       return { ok: false, reason: "token_missing" };
     }
-    if (!safeEqualSecret(connectAuth.token, auth.token)) {
-      limiter?.recordFailure(ip, rateLimitScope);
-      return { ok: false, reason: "token_mismatch" };
+
+    // Check if it's a static token match
+    if (safeEqualSecret(connectAuth.token, auth.token)) {
+      limiter?.reset(ip, rateLimitScope);
+      log.info("token match: static token matched");
+      return { ok: true, method: "token" };
     }
-    limiter?.reset(ip, rateLimitScope);
-    return { ok: true, method: "token" };
+
+    // Check if it's an LDAP token (base64 encoded JSON with method: "ldap")
+    log.debug("checking LDAP token", { tokenLength: connectAuth.token?.length });
+    const ldapTokenResult = tryVerifyLdapToken(connectAuth.token);
+    log.debug("LDAP token verification result", ldapTokenResult);
+    if (ldapTokenResult.ok) {
+      limiter?.reset(ip, rateLimitScope);
+      log.info("LDAP token valid", { user: ldapTokenResult.user, sessionPath: ldapTokenResult.sessionPath });
+      return {
+        ok: true,
+        method: "ldap-token",
+        user: ldapTokenResult.user,
+        sessionPath: ldapTokenResult.sessionPath,
+      };
+    }
+
+    limiter?.recordFailure(ip, rateLimitScope);
+    log.info("token mismatch");
+    return { ok: false, reason: "token_mismatch" };
   }
 
   if (auth.mode === "password") {

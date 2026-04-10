@@ -29,6 +29,10 @@ export function classifyControlUiRequest(params: {
     if (pathname === "/plugins" || pathname.startsWith("/plugins/")) {
       return { kind: "not-control-ui" };
     }
+    // Allow LDAP authentication endpoints
+    if (pathname === "/api/ldap/login" || pathname === "/api/ldap/test") {
+      return { kind: "serve" };
+    }
     if (pathname === "/api" || pathname.startsWith("/api/")) {
       return { kind: "not-control-ui" };
     }
@@ -40,6 +44,12 @@ export function classifyControlUiRequest(params: {
 
   if (!pathname.startsWith(`${basePath}/`) && pathname !== basePath) {
     return { kind: "not-control-ui" };
+  }
+  // Allow LDAP authentication endpoints even with base path
+  const ldapLoginPath = basePath ? `${basePath}/api/ldap/login` : "/api/ldap/login";
+  const ldapTestPath = basePath ? `${basePath}/api/ldap/test` : "/api/ldap/test";
+  if (pathname === ldapLoginPath || pathname === ldapTestPath) {
+    return { kind: "serve" };
   }
   if (!isReadHttpMethod(method)) {
     return { kind: "not-control-ui" };

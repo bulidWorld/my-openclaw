@@ -20,7 +20,7 @@ import { loadExecApprovals } from "./controllers/exec-approvals.ts";
 import { loadLogs } from "./controllers/logs.ts";
 import { loadNodes } from "./controllers/nodes.ts";
 import { loadPresence } from "./controllers/presence.ts";
-import { loadSessions } from "./controllers/sessions.ts";
+import { loadSessions, ensureActiveSessionAfterLoad } from "./controllers/sessions.ts";
 import { loadSkills } from "./controllers/skills.ts";
 import { loadUsage } from "./controllers/usage.ts";
 import {
@@ -214,6 +214,7 @@ export function setThemeMode(
 }
 
 export async function refreshActiveTab(host: SettingsHost) {
+  console.log("on Helllo recall:", host.tab)
   if (host.tab === "overview") {
     await loadOverview(host);
   }
@@ -227,7 +228,7 @@ export async function refreshActiveTab(host: SettingsHost) {
     await loadUsage(host as unknown as OpenClawApp);
   }
   if (host.tab === "sessions") {
-    await loadSessions(host as unknown as OpenClawApp);
+    await ensureActiveSessionAfterLoad(host as unknown as OpenClawApp);
   }
   if (host.tab === "cron") {
     await loadCron(host);

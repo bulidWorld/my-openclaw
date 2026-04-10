@@ -138,6 +138,7 @@ export function buildEmbeddedRunBaseParams(params: {
     timeoutMs: params.run.timeoutMs,
     runId: params.runId,
     allowTransientCooldownProbe: params.allowTransientCooldownProbe,
+    sessionPath: params.run.sessionPath,
   };
 }
 

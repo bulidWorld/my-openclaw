@@ -180,6 +180,12 @@ export function loadSessionStore(
   storePath: string,
   opts: LoadSessionStoreOptions = {},
 ): Record<string, SessionEntry> {
+
+  console.log("[loadSessionStore] called", {
+    stack: new Error().stack?.split("\n").slice(1, 21).join("\n")
+  });
+
+  console.log("[loadSessionStore] storePath:", storePath, "skipCache:", opts.skipCache);
   // Check cache first if enabled
   if (!opts.skipCache && isSessionStoreCacheEnabled()) {
     const currentFileStat = getFileStatSnapshot(storePath);
@@ -189,6 +195,7 @@ export function loadSessionStore(
       sizeBytes: currentFileStat?.sizeBytes,
     });
     if (cached) {
+      console.log("[loadSessionStore] cache hit, storePath:", storePath);
       return cached;
     }
   }
@@ -235,7 +242,6 @@ export function loadSessionStore(
   } else {
     setSerializedSessionStore(storePath, undefined);
   }
-
   applySessionStoreMigrations(store);
 
   // Cache the result if caching is enabled
@@ -249,6 +255,7 @@ export function loadSessionStore(
     });
   }
 
+  console.log("[loadSessionStore] returning store with", Object.keys(store).length, "entries, storePath:", storePath);
   return structuredClone(store);
 }
 
@@ -570,17 +577,21 @@ export async function updateSessionStore<T>(
   mutator: (store: Record<string, SessionEntry>) => Promise<T> | T,
   opts?: SaveSessionStoreOptions,
 ): Promise<T> {
+  console.log("[updateSessionStore] START, storePath:", storePath);
   return await withSessionStoreLock(storePath, async () => {
     // Always re-read inside the lock to avoid clobbering concurrent writers.
     const store = loadSessionStore(storePath, { skipCache: true });
+    console.log("[updateSessionStore] loaded store, keys count:", Object.keys(store).length);
     const previousAcpByKey = collectAcpMetadataSnapshot(store);
     const result = await mutator(store);
+    console.log("[updateSessionStore] mutator completed, calling saveSessionStoreUnlocked");
     preserveExistingAcpMetadata({
       previousAcpByKey,
       nextStore: store,
       allowDropSessionKeys: opts?.allowDropAcpMetaSessionKeys,
     });
     await saveSessionStoreUnlocked(storePath, store, opts);
+    console.log("[updateSessionStore] saveSessionStoreUnlocked completed, storePath:", storePath);
     return result;
   });
 }

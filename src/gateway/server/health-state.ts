@@ -67,10 +67,10 @@ export function setBroadcastHealthUpdate(fn: ((snap: HealthSummary) => void) | n
   broadcastHealthUpdate = fn;
 }
 
-export async function refreshGatewayHealthSnapshot(opts?: { probe?: boolean }) {
+export async function refreshGatewayHealthSnapshot(opts?: { probe?: boolean; sessionPath?: string }) {
   if (!healthRefresh) {
     healthRefresh = (async () => {
-      const snap = await getHealthSnapshot({ probe: opts?.probe });
+      const snap = await getHealthSnapshot({ probe: opts?.probe, sessionPath: opts?.sessionPath });
       healthCache = snap;
       healthVersion += 1;
       if (broadcastHealthUpdate) {

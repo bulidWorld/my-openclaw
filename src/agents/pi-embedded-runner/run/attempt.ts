@@ -2606,6 +2606,7 @@ export async function runEmbeddedAttempt(
         enforceFinalTag: params.enforceFinalTag,
         config: params.config,
         sessionKey: sandboxSessionKey,
+        sessionPath: params.sessionPath,
         sessionId: params.sessionId,
         agentId: sessionAgentId,
       });

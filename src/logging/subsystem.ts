@@ -231,7 +231,10 @@ function formatConsoleLine(opts: {
   })();
   const prefixToken = prefixColor(prefix);
   const head = [time, prefixToken].filter(Boolean).join(" ");
-  return `${head} ${levelColor(displayMessage)}`;
+  const metaStr = (opts.meta && Object.keys(opts.meta).length > 0)
+    ? color.gray(JSON.stringify(opts.meta))
+    : "";
+  return `${head} ${levelColor(displayMessage)}${metaStr ? " " + metaStr : ""}`;
 }
 
 function writeConsoleLine(level: LogLevel, line: string) {

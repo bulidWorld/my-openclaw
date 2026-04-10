@@ -1,0 +1,105 @@
+# LDAP 配置文件
+# 将此文件保存在 ~/.openclaw/ldap.config 或 OPENCLAW_LDAP_CONFIG_PATH 指定的路径
+# 所有 LDAP 相关的配置都应在此文件中管理
+
+{
+  // 是否启用 LDAP 认证（默认：false）
+  "enabled": true,
+
+  // LDAP 服务器 URL
+  // 支持 ldap:// 或 ldaps:// 协议
+  // 示例：
+  //   "ldap://192.168.124.247:389"
+  //   "ldaps://ldap.example.com:636"
+  "url": "ldap://your-ldap-server:389",
+
+  // 管理员绑定 DN（用于搜索用户）
+  // 示例：
+  //   "cn=admin,dc=example,dc=com"
+  //   "uid=ldapuser,ou=users,dc=naze"
+  // 如果留空，则使用匿名绑定
+  "bindDN": "cn=admin,dc=naze",
+
+  // 管理员绑定密码
+  // 建议使用环境变量引用或 SecretRef
+  // 示例：
+  //   "your-admin-password"
+  //   {"secretRef": {"env": "LDAP_BIND_PASSWORD"}}
+  "bindCredentials": "your-bind-password",
+
+  // 搜索基础 DN
+  // 指定从哪个位置开始搜索用户
+  // 示例：
+  //   "dc=example,dc=com"
+  //   "ou=users,dc=naze"
+  "searchBase": "dc=naze",
+
+  // 搜索过滤器（可选）
+  // 默认使用 (uid=${username})
+  // 示例：
+  //   "(|(uid=${username})(mail=${username}))"
+  //   "(&(objectClass=person)(uid=${username}))"
+  "searchFilter": "(uid=${username})",
+
+  // 用户名属性名（可选）
+  // 默认使用 "uid"
+  // 常见值：uid, cn, sAMAccountName, mail
+  "usernameAttribute": "uid",
+
+  // 用户 DN 模板（可选）
+  // 如果设置，将直接使用该模板进行绑定，而跳过搜索步骤
+  // 示例：
+  //   "uid=${username},ou=users,dc=naze"
+  //   "cn=${username},ou=people,dc=example,dc=com"
+  // "userDnTemplate": "uid=${username},ou=users,dc=naze",
+
+  // TLS 配置
+  "tlsEnabled": false,
+
+  // 是否验证 TLS 证书（默认：true）
+  // 自签名证书可设置为 false
+  "tlsRejectUnauthorized": true,
+
+  // 会话配置
+  "session": {
+    // 会话超时时间（毫秒），默认 24 小时
+    "timeoutMs": 86400000,
+
+    // 是否启用独立会话（每个 LDAP 用户独立的会话空间）
+    // 启用后，每个用户登录后只能访问自己的会话、技能和配置
+    "isolatedSessions": true,
+
+    // 会话存储目录（可选）
+    // 默认：~/.openclaw/sessions/ldap/<username>
+    // "storageDir": "~/.openclaw/sessions/ldap"
+  },
+
+  // 用户属性映射（可选）
+  // 用于从 LDAP 记录中提取用户信息
+  "userAttributes": {
+    // 显示名称属性（默认：cn 或 uid）
+    "displayName": "cn",
+    // 邮箱属性（默认：mail）
+    "email": "mail",
+    // 用户 ID 属性（默认：uid）
+    "userId": "uid"
+  },
+
+  // 访问控制（可选）
+  "accessControl": {
+    // 允许访问的用户列表（DN 或 uid）
+    // 如果为空，则允许所有能成功认证的用户
+    // "allowedUsers": [
+    //   "uid=admin,ou=users,dc=naze",
+    //   "john.doe"
+    // ],
+
+    // 允许的用户组（DN）
+    // "allowedGroups": [
+    //   "cn=openclaw-users,ou=groups,dc=naze"
+    // ],
+
+    // 拒绝的用户列表
+    // "deniedUsers": []
+  }
+}

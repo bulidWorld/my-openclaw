@@ -17,6 +17,7 @@ import {
   updateSessionStore,
 } from "../../config/sessions.js";
 import { registerAgentRunContext } from "../../infra/agent-events.js";
+import { resolveSessionPathFromClient } from "../session-path-resolver.js";
 import {
   resolveAgentDeliveryPlan,
   resolveAgentOutboundTarget,
@@ -86,6 +87,7 @@ function resolveCanResetSessionFromClient(client: GatewayRequestHandlerOptions["
 async function runSessionResetFromAgent(params: {
   key: string;
   reason: "new" | "reset";
+  sessionPath?: string;
 }): Promise<
   | { ok: true; key: string; sessionId?: string }
   | { ok: false; error: ReturnType<typeof errorShape> }
@@ -94,6 +96,7 @@ async function runSessionResetFromAgent(params: {
     key: params.key,
     reason: params.reason,
     commandSource: "gateway:agent",
+    sessionPath: params.sessionPath,
   });
   if (!result.ok) {
     return result;
@@ -111,12 +114,13 @@ function emitSessionsChanged(
     "broadcastToConnIds" | "getSessionEventSubscriberConnIds"
   >,
   payload: { sessionKey?: string; reason: string },
+  sessionPath?: string,
 ) {
   const connIds = context.getSessionEventSubscriberConnIds();
   if (connIds.size === 0) {
     return;
   }
-  const sessionRow = payload.sessionKey ? loadGatewaySessionRow(payload.sessionKey) : null;
+  const sessionRow = payload.sessionKey ? loadGatewaySessionRow(payload.sessionKey, sessionPath) : null;
   context.broadcastToConnIds(
     "sessions.changed",
     {
@@ -318,6 +322,8 @@ export const agentHandlers: GatewayRequestHandlers = {
       }
     }
 
+    const sessionPath = resolveSessionPathFromClient(client);
+
     const agentIdRaw = typeof request.agentId === "string" ? request.agentId.trim() : "";
     const agentId = agentIdRaw ? normalizeAgentId(agentIdRaw) : undefined;
     if (agentId) {
@@ -392,9 +398,11 @@ export const agentHandlers: GatewayRequestHandlers = {
         return;
       }
       const resetReason = resetCommandMatch[1]?.toLowerCase() === "new" ? "new" : "reset";
+      const sessionPath = resolveSessionPathFromClient(client);
       const resetResult = await runSessionResetFromAgent({
         key: requestedSessionKey,
         reason: resetReason,
+        sessionPath,
       });
       if (!resetResult.ok) {
         respond(false, undefined, resetResult.error);
@@ -666,13 +674,13 @@ export const agentHandlers: GatewayRequestHandlers = {
       emitSessionsChanged(context, {
         sessionKey: resolvedSessionKey,
         reason: "create",
-      });
+      }, sessionPath);
     }
     if (resolvedSessionKey) {
       emitSessionsChanged(context, {
         sessionKey: resolvedSessionKey,
         reason: "send",
-      });
+      }, sessionPath);
     }
 
     const resolvedThreadId = explicitThreadId ?? deliveryPlan.resolvedThreadId;

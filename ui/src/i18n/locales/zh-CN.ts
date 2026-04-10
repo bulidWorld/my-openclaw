@@ -154,6 +154,16 @@ export const zh_CN: TranslationMap = {
   login: {
     subtitle: "网关仪表盘",
     passwordPlaceholder: "可选",
+    tab: {
+      token: "令牌",
+      ldap: "LDAP",
+    },
+    ldap: {
+      username: "用户名",
+      usernamePlaceholder: "输入您的 LDAP 用户名",
+      password: "密码",
+      passwordPlaceholder: "输入您的 LDAP 密码",
+    },
   },
   chat: {
     disconnected: "已断开与网关的连接。",

@@ -419,14 +419,18 @@ export const formatHealthChannelLines = (
 export async function getHealthSnapshot(params?: {
   timeoutMs?: number;
   probe?: boolean;
+  sessionPath?: string;
 }): Promise<HealthSummary> {
   const timeoutMs = params?.timeoutMs;
+  const sessionPath = params?.sessionPath;
   const cfg = loadConfig();
   const { defaultAgentId, ordered } = resolveAgentOrder(cfg);
   const channelBindings = buildChannelAccountBindings(cfg);
   const sessionCache = new Map<string, HealthSummary["sessions"]>();
   const agents: AgentHealthSummary[] = ordered.map((entry) => {
-    const storePath = resolveStorePath(cfg.session?.store, { agentId: entry.id });
+    const storePath = resolveStorePath(cfg.session?.store, { agentId: entry.id, sessionPath });
+    console.log("[getHealthSnapshot] storePath for agent:", { agentId: entry.id, storePath, sessionPath })
+
     const sessions = sessionCache.get(storePath) ?? buildSessionSummary(storePath);
     sessionCache.set(storePath, sessions);
     return {
@@ -443,7 +447,7 @@ export async function getHealthSnapshot(params?: {
     : 0;
   const sessions =
     defaultAgent?.sessions ??
-    buildSessionSummary(resolveStorePath(cfg.session?.store, { agentId: defaultAgentId }));
+    buildSessionSummary(resolveStorePath(cfg.session?.store, { agentId: defaultAgentId, sessionPath }));
 
   const start = Date.now();
   const cappedTimeout = timeoutMs === undefined ? DEFAULT_TIMEOUT_MS : Math.max(50, timeoutMs);
@@ -590,7 +594,7 @@ export async function getHealthSnapshot(params?: {
       recent: sessions.recent,
     },
   };
-
+  console.log("[getHealthSnapshot] return summary:", { sessionPath, sessionsPath: sessions.path, sessionsCount: sessions.count, agentCount: agents.length })
   return summary;
 }
 

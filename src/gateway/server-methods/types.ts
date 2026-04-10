@@ -21,6 +21,8 @@ export type GatewayClient = {
   canvasHostUrl?: string;
   canvasCapability?: string;
   canvasCapabilityExpiresAtMs?: number;
+  /** Session path for LDAP users (isolated sessions). */
+  sessionPath?: string;
   /** Internal-only auth context that cannot be supplied through gateway RPC payloads. */
   internal?: {
     allowModelOverride?: boolean;
@@ -41,7 +43,7 @@ export type GatewayRequestContext = {
   execApprovalManager?: ExecApprovalManager;
   loadGatewayModelCatalog: () => Promise<ModelCatalogEntry[]>;
   getHealthCache: () => HealthSummary | null;
-  refreshHealthSnapshot: (opts?: { probe?: boolean }) => Promise<HealthSummary>;
+  refreshHealthSnapshot: (opts?: { probe?: boolean; sessionPath?: string }) => Promise<HealthSummary>;
   logHealth: { error: (message: string) => void };
   logGateway: SubsystemLogger;
   incrementPresenceVersion: () => number;

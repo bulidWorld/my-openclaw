@@ -10,4 +10,6 @@ export type GatewayWsClient = {
   canvasHostUrl?: string;
   canvasCapability?: string;
   canvasCapabilityExpiresAtMs?: number;
+  /** Session path for LDAP users (isolated sessions). */
+  sessionPath?: string;
 };

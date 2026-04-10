@@ -378,6 +378,16 @@ export const en: TranslationMap = {
   login: {
     subtitle: "Gateway Dashboard",
     passwordPlaceholder: "optional",
+    tab: {
+      token: "Token",
+      ldap: "LDAP",
+    },
+    ldap: {
+      username: "Username",
+      usernamePlaceholder: "Enter your LDAP username",
+      password: "Password",
+      passwordPlaceholder: "Enter your LDAP password",
+    },
   },
   chat: {
     disconnected: "Disconnected from gateway.",

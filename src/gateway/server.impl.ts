@@ -72,6 +72,7 @@ import {
 } from "../secrets/runtime.js";
 import { onSessionLifecycleEvent } from "../sessions/session-lifecycle-events.js";
 import { onSessionTranscriptUpdate } from "../sessions/transcript-events.js";
+import { getConnectionSessionPath } from "./session-path-context.js";
 import { runSetupWizard } from "../wizard/setup.js";
 import { createAuthRateLimiter, type AuthRateLimiter } from "./auth-rate-limit.js";
 import { startChannelHealthMonitor } from "./channel-health-monitor.js";
@@ -933,11 +934,15 @@ export async function startGatewayServer(
           if (connIds.size === 0) {
             return;
           }
-          const { entry, storePath } = loadSessionEntry(sessionKey);
+          // Resolve sessionPath from the first subscribed connection for proper session isolation
+          const sessionPath = connIds.size > 0
+            ? getConnectionSessionPath(Array.from(connIds)[0])
+            : undefined;
+          const { entry, storePath } = loadSessionEntry(sessionKey, sessionPath);
           const messageSeq = entry?.sessionId
             ? readSessionMessages(entry.sessionId, storePath, entry.sessionFile).length
             : undefined;
-          const sessionRow = loadGatewaySessionRow(sessionKey);
+          const sessionRow = loadGatewaySessionRow(sessionKey, sessionPath, { includeDerivedTitles: false, includeLastMessage: false });
           const sessionSnapshot = sessionRow
             ? {
                 session: sessionRow,
@@ -1010,7 +1015,11 @@ export async function startGatewayServer(
           if (connIds.size === 0) {
             return;
           }
-          const sessionRow = loadGatewaySessionRow(event.sessionKey);
+          // Resolve sessionPath from the first subscribed connection for proper session isolation
+          const sessionPath = connIds.size > 0
+            ? getConnectionSessionPath(Array.from(connIds)[0])
+            : undefined;
+          const sessionRow = loadGatewaySessionRow(event.sessionKey, sessionPath);
           broadcastToConnIds(
             "sessions.changed",
             {

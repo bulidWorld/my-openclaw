@@ -311,6 +311,18 @@ const entries: SubCliEntry[] = [
       mod.registerCompletionCli(program);
     },
   },
+  {
+    name: "ldap",
+    description: "LDAP authentication and session management",
+    hasSubcommands: true,
+    register: async (program) => {
+      const { createLdapCommands } = await import("../../commands/ldap.js");
+      const ldapCommand = createLdapCommands();
+      // Remove existing if any to avoid duplicates
+      program.commands = program.commands.filter((cmd) => cmd.name() !== "ldap");
+      program.addCommand(ldapCommand);
+    },
+  },
 ];
 
 export function getSubCliEntries(): ReadonlyArray<SubCliDescriptor> {

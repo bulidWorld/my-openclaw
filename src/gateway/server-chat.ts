@@ -463,8 +463,8 @@ export function createAgentEventHandler({
   toolEventRecipients,
   sessionEventSubscribers,
 }: AgentEventHandlerOptions) {
-  const buildSessionEventSnapshot = (sessionKey: string, evt?: AgentEventPayload) => {
-    const row = loadGatewaySessionRow(sessionKey);
+  const buildSessionEventSnapshot = (sessionKey: string, evt?: AgentEventPayload, sessionPath?: string) => {
+    const row = loadGatewaySessionRow(sessionKey, sessionPath);
     const lifecyclePatch = evt
       ? deriveGatewaySessionLifecycleSnapshot({
           session: row
@@ -816,6 +816,9 @@ export function createAgentEventHandler({
       sessionKey &&
       (lifecyclePhase === "start" || lifecyclePhase === "end" || lifecyclePhase === "error")
     ) {
+      // Try to get sessionPath from agent run context for LDAP user isolation
+      const runContext = getAgentRunContext(evt.runId);
+      const sessionPath = runContext?.sessionPath;
       void persistGatewaySessionLifecycleEvent({ sessionKey, event: evt }).catch(() => undefined);
       const sessionEventConnIds = sessionEventSubscribers.getAll();
       if (sessionEventConnIds.size > 0) {
@@ -826,7 +829,7 @@ export function createAgentEventHandler({
             phase: lifecyclePhase,
             runId: evt.runId,
             ts: evt.ts,
-            ...buildSessionEventSnapshot(sessionKey, evt),
+            ...buildSessionEventSnapshot(sessionKey, evt, sessionPath),
           },
           sessionEventConnIds,
           { dropIfSlow: true },

@@ -56,6 +56,7 @@ export function handleAutoCompactionEnd(
     const observedCompactionCount = ctx.getCompactionCount();
     void reconcileSessionStoreCompactionCountAfterSuccess({
       sessionKey: ctx.params.sessionKey,
+      sessionPath: ctx.params.sessionPath,
       agentId: ctx.params.agentId,
       configStore: ctx.params.config?.session?.store,
       observedCompactionCount,
@@ -103,16 +104,17 @@ export function handleAutoCompactionEnd(
 
 export async function reconcileSessionStoreCompactionCountAfterSuccess(params: {
   sessionKey?: string;
+  sessionPath?: string;
   agentId?: string;
   configStore?: string;
   observedCompactionCount: number;
   now?: number;
 }): Promise<number | undefined> {
-  const { sessionKey, agentId, configStore, observedCompactionCount, now = Date.now() } = params;
+  const { sessionKey, sessionPath, agentId, configStore, observedCompactionCount, now = Date.now() } = params;
   if (!sessionKey || observedCompactionCount <= 0) {
     return undefined;
   }
-  const storePath = resolveStorePath(configStore, { agentId });
+  const storePath = resolveStorePath(configStore, { agentId, sessionPath });
   const nextEntry = await updateSessionStoreEntry({
     storePath,
     sessionKey,

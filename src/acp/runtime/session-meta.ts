@@ -46,11 +46,13 @@ function resolveStoreSessionKey(store: Record<string, SessionEntry>, sessionKey:
 export function resolveSessionStorePathForAcp(params: {
   sessionKey: string;
   cfg?: OpenClawConfig;
+  sessionPath?: string;
 }): { cfg: OpenClawConfig; storePath: string } {
   const cfg = params.cfg ?? loadConfig();
   const parsed = parseAgentSessionKey(params.sessionKey);
   const storePath = resolveStorePath(cfg.session?.store, {
     agentId: parsed?.agentId,
+    sessionPath: params.sessionPath,
   });
   return { cfg, storePath };
 }
@@ -58,6 +60,7 @@ export function resolveSessionStorePathForAcp(params: {
 export function readAcpSessionEntry(params: {
   sessionKey: string;
   cfg?: OpenClawConfig;
+  sessionPath?: string;
 }): AcpSessionStoreEntry | null {
   const sessionKey = params.sessionKey.trim();
   if (!sessionKey) {
@@ -66,6 +69,7 @@ export function readAcpSessionEntry(params: {
   const { cfg, storePath } = resolveSessionStorePathForAcp({
     sessionKey,
     cfg: params.cfg,
+    sessionPath: params.sessionPath,
   });
   let store: Record<string, SessionEntry>;
   let storeReadFailed = false;
@@ -128,6 +132,7 @@ export async function listAcpSessionEntries(params: {
 export async function upsertAcpSessionMeta(params: {
   sessionKey: string;
   cfg?: OpenClawConfig;
+  sessionPath?: string;
   mutate: (
     current: SessionAcpMeta | undefined,
     entry: SessionEntry | undefined,
@@ -140,6 +145,7 @@ export async function upsertAcpSessionMeta(params: {
   const { storePath } = resolveSessionStorePathForAcp({
     sessionKey,
     cfg: params.cfg,
+    sessionPath: params.sessionPath,
   });
   return await updateSessionStore(
     storePath,

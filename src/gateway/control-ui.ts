@@ -29,6 +29,7 @@ import {
   normalizeControlUiBasePath,
   resolveAssistantAvatarUrl,
 } from "./control-ui-shared.js";
+import { handleLdapLoginRequest, handleLdapTestConnectionRequest } from "./ldap-handler.js";
 
 const ROOT_PREFIX = "/";
 const CONTROL_UI_ASSETS_MISSING_MESSAGE =
@@ -340,6 +341,20 @@ export function handleControlUiHttpRequest(
   }
 
   applyControlUiSecurityHeaders(res);
+
+  const ldapConfig = opts?.config?.ldap;
+  const ldapLoginPath = basePath ? `${basePath}/api/ldap/login` : "/api/ldap/login";
+  const ldapTestPath = basePath ? `${basePath}/api/ldap/test` : "/api/ldap/test";
+
+  if (pathname === ldapLoginPath) {
+    handleLdapLoginRequest(req, res, ldapConfig || { enabled: false, url: "", searchBase: "" });
+    return true;
+  }
+
+  if (pathname === ldapTestPath) {
+    handleLdapTestConnectionRequest(req, res, ldapConfig || { enabled: false, url: "", searchBase: "" });
+    return true;
+  }
 
   const bootstrapConfigPath = basePath
     ? `${basePath}${CONTROL_UI_BOOTSTRAP_CONFIG_PATH}`

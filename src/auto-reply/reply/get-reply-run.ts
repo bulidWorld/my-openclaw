@@ -197,6 +197,7 @@ type RunPreparedReplyParams = {
   sessionKey: string;
   sessionId?: string;
   storePath?: string;
+  sessionPath?: string;
   workspaceDir: string;
   abortedLastRun: boolean;
 };
@@ -238,6 +239,7 @@ export async function runPreparedReply(
     sessionKey,
     sessionId,
     storePath,
+    sessionPath,
     workspaceDir,
     sessionStore,
   } = params;
@@ -526,6 +528,7 @@ export async function runPreparedReply(
       agentDir,
       sessionId: sessionIdFinal,
       sessionKey,
+      sessionPath,
       messageProvider: resolveOriginMessageProvider({
         originatingChannel: ctx.OriginatingChannel ?? sessionCtx.OriginatingChannel,
         // Prefer Provider over Surface for fallback channel identity.
@@ -593,6 +596,7 @@ export async function runPreparedReply(
     sessionStore,
     sessionKey,
     storePath,
+    sessionPath,
     defaultModel,
     agentCfgContextTokens: agentCfg?.contextTokens,
     resolvedVerboseLevel: resolvedVerboseLevel ?? "off",
