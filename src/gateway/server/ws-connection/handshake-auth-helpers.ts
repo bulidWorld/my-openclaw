@@ -75,13 +75,14 @@ export function shouldSkipBackendSelfPairing(params: {
   }
   const usesSharedSecretAuth = params.authMethod === "token" || params.authMethod === "password";
   const usesDeviceTokenAuth = params.authMethod === "device-token";
+  const usesLdapTokenAuth = params.authMethod === "ldap-token";
   // `authMethod === "device-token"` only reaches this helper after the caller
   // has already accepted auth (`authOk === true`), so a separate
   // `deviceTokenAuthOk` flag would be redundant here.
   return (
     params.isLocalClient &&
     !params.hasBrowserOriginHeader &&
-    ((params.sharedAuthOk && usesSharedSecretAuth) || usesDeviceTokenAuth)
+    ((params.sharedAuthOk && usesSharedSecretAuth) || usesDeviceTokenAuth || usesLdapTokenAuth)
   );
 }
 

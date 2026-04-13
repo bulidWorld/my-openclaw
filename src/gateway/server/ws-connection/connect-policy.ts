@@ -39,8 +39,14 @@ export function shouldSkipControlUiPairing(
   role: GatewayRole,
   trustedProxyAuthOk = false,
   authMode?: string,
+  authMethod?: string,
 ): boolean {
   if (trustedProxyAuthOk) {
+    return true;
+  }
+  // LDAP token authentication is a verified authentication method that
+  // should skip pairing requirement for Control UI operator connections
+  if (policy.isControlUi && role === "operator" && authMethod === "ldap-token") {
     return true;
   }
   // When auth is completely disabled (mode=none), there is no shared secret
