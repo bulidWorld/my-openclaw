@@ -440,20 +440,34 @@ function renderAttachmentPreview(props: ChatProps): TemplateResult | typeof noth
   return html`
     <div class="chat-attachments-preview">
       ${attachments.map(
-        (att) => html`
-          <div class="chat-attachment-thumb">
-            <img src=${att.dataUrl} alt="Attachment preview" />
-            <button
-              class="chat-attachment-remove"
-              type="button"
-              aria-label="Remove attachment"
-              @click=${() => {
-                const next = (props.attachments ?? []).filter((a) => a.id !== att.id);
-                props.onAttachmentsChange?.(next);
-              }}
-            >&times;</button>
-          </div>
-        `,
+        (att) => {
+          const isWordDoc = att.mimeType?.includes("wordprocessingml") || att.mimeType === "application/msword";
+          return html`
+            <div class="chat-attachment-thumb">
+              ${isWordDoc
+                ? html`
+                    <div class="chat-attachment-doc-icon">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
+                        <polyline points="14 2 14 8 20 8"/>
+                      </svg>
+                    </div>
+                    <div class="chat-attachment-doc-name">${att.mimeType?.includes("openxmlformats") ? "Word" : "DOC"}</div>
+                  `
+                : html`<img src=${att.dataUrl} alt="Attachment preview" />`
+              }
+              <button
+                class="chat-attachment-remove"
+                type="button"
+                aria-label="Remove attachment"
+                @click=${() => {
+                  const next = (props.attachments ?? []).filter((a) => a.id !== att.id);
+                  props.onAttachmentsChange?.(next);
+                }}
+              >&times;</button>
+            </div>
+          `;
+        },
       )}
     </div>
   `;

@@ -14,6 +14,19 @@ const SILENT_REPLY_PATTERN = /^\s*NO_REPLY\s*$/;
 function isSilentReplyStream(text: string): boolean {
   return SILENT_REPLY_PATTERN.test(text);
 }
+
+function isWordDocumentMimeType(mimeType: string | undefined): boolean {
+  if (!mimeType) {
+    return false;
+  }
+  const mime = mimeType.toLowerCase();
+  return (
+    mime === "application/msword" ||
+    mime === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
+    mime === "application/vnd.ms-word" ||
+    mime.includes("wordprocessingml")
+  );
+}
 /** Client-side defense-in-depth: detect assistant messages whose text is purely NO_REPLY. */
 function isAssistantSilentReply(message: unknown): boolean {
   if (!message || typeof message !== "object") {
@@ -184,10 +197,18 @@ export async function sendChatMessage(
   // Add image previews to the message for display
   if (hasAttachments) {
     for (const att of attachments) {
-      contentBlocks.push({
-        type: "image",
-        source: { type: "base64", media_type: att.mimeType, data: att.dataUrl },
-      });
+      if (att.mimeType?.startsWith("image/")) {
+        contentBlocks.push({
+          type: "image",
+          source: { type: "base64", media_type: att.mimeType, data: att.dataUrl },
+        });
+      } else if (isWordDocumentMimeType(att.mimeType)) {
+        // Word documents are sent as attachments, not displayed inline
+        contentBlocks.push({
+          type: "document",
+          source: { type: "base64", media_type: att.mimeType, data: att.dataUrl },
+        });
+      }
     }
   }
 
@@ -216,7 +237,7 @@ export async function sendChatMessage(
             return null;
           }
           return {
-            type: "image",
+            type: att.mimeType?.startsWith("image/") ? "image" : "document",
             mimeType: parsed.mimeType,
             content: parsed.content,
           };

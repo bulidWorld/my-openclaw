@@ -14,9 +14,21 @@ export type ChatImageContent = {
   mimeType: string;
 };
 
+export type ChatWordDocumentContent = {
+  type: "word_document";
+  data: string;
+  mimeType: string;
+  fileName?: string;
+};
+
 export type ParsedMessageWithImages = {
   message: string;
   images: ChatImageContent[];
+};
+
+export type ParsedMessageWithWordDocs = {
+  message: string;
+  wordDocs: ChatWordDocumentContent[];
 };
 
 type AttachmentLog = {
@@ -87,6 +99,64 @@ function validateAttachmentBase64OrThrow(
     );
   }
   return sizeBytes;
+}
+
+/**
+ * Parse attachments and extract Word documents as structured content blocks.
+ * Returns the message text and an array of Word document content blocks.
+ */
+export async function parseMessageWithWordDocs(
+  message: string,
+  attachments: ChatAttachment[] | undefined,
+  opts?: { maxBytes?: number; log?: AttachmentLog },
+): Promise<ParsedMessageWithWordDocs> {
+  const maxBytes = opts?.maxBytes ?? 10_000_000; // 10MB decoded bytes for Word docs
+  const log = opts?.log;
+  if (!attachments || attachments.length === 0) {
+    return { message, wordDocs: [] };
+  }
+
+  const wordDocs: ChatWordDocumentContent[] = [];
+
+  for (const [idx, att] of attachments.entries()) {
+    if (!att) {
+      continue;
+    }
+    const normalized = normalizeAttachment(att, idx, {
+      stripDataUrlPrefix: true,
+      requireImageMime: false,
+    });
+    validateAttachmentBase64OrThrow(normalized, { maxBytes });
+    const { base64: b64, label, mime } = normalized;
+
+    const providedMime = normalizeMime(mime);
+    if (!isWordDocumentMime(providedMime)) {
+      log?.warn(`attachment ${label}: not a Word document (${providedMime}), dropping`);
+      continue;
+    }
+
+    wordDocs.push({
+      type: "word_document",
+      data: b64,
+      mimeType: providedMime ?? mime,
+      fileName: label,
+    });
+  }
+
+  return { message, wordDocs };
+}
+
+function isWordDocumentMime(mime?: string): boolean {
+  if (!mime) {
+    return false;
+  }
+  const m = mime.toLowerCase();
+  return (
+    m === "application/msword" ||
+    m === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
+    m === "application/vnd.ms-word" ||
+    m.includes("wordprocessingml")
+  );
 }
 
 /**
