@@ -153,7 +153,12 @@ export const zh_TW: TranslationMap = {
   },
   login: {
     subtitle: "閘道儀表板",
-    passwordPlaceholder: "可選",
+    ldap: {
+      username: "用戶名",
+      usernamePlaceholder: "輸入您的 LDAP 用戶名",
+      password: "密碼",
+      passwordPlaceholder: "輸入您的 LDAP 密碼",
+    },
   },
   chat: {
     disconnected: "已斷開與網關的連接。",

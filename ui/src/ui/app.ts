@@ -1,7 +1,7 @@
 import { LitElement } from "lit";
 import { customElement, state } from "lit/decorators.js";
 import { resolveAgentIdFromSessionKey } from "../../../src/routing/session-key.js";
-import { i18n, I18nController, isSupportedLocale } from "../i18n/index.ts";
+import { I18nController } from "../i18n/index.ts";
 import {
   handleChannelConfigReload as handleChannelConfigReloadInternal,
   handleChannelConfigSave as handleChannelConfigSaveInternal,
@@ -123,11 +123,8 @@ export class OpenClawApp extends LitElement {
   connectGeneration = 0;
   @state() settings: UiSettings = loadSettings();
   @state() password = "";
-  @state() loginMethod: "token" | "ldap" = "token";
   @state() ldapUsername = "";
   @state() ldapPassword = "";
-  @state() loginShowGatewayToken = false;
-  @state() loginShowGatewayPassword = false;
   @state() loginShowLdapPassword = false;
   @state() tab: Tab = "chat";
   @state() onboarding = resolveOnboardingMode();
