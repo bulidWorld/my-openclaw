@@ -23,6 +23,25 @@ type ImageBlock = {
   alt?: string;
 };
 
+type DocumentBlock = {
+  url: string;
+  mimeType: string;
+  fileName?: string;
+};
+
+function isWordDocumentMimeType(mimeType: string): boolean {
+  if (!mimeType) {
+    return false;
+  }
+  const mime = mimeType.toLowerCase();
+  return (
+    mime === "application/msword" ||
+    mime === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
+    mime === "application/vnd.ms-word" ||
+    mime.includes("wordprocessingml")
+  );
+}
+
 function extractImages(message: unknown): ImageBlock[] {
   const m = message as Record<string, unknown>;
   const content = m.content;
@@ -58,6 +77,35 @@ function extractImages(message: unknown): ImageBlock[] {
   }
 
   return images;
+}
+
+function extractDocuments(message: unknown): DocumentBlock[] {
+  const m = message as Record<string, unknown>;
+  const content = m.content;
+  const documents: DocumentBlock[] = [];
+
+  if (Array.isArray(content)) {
+    for (const block of content) {
+      if (typeof block !== "object" || block === null) {
+        continue;
+      }
+      const b = block as Record<string, unknown>;
+
+      if (b.type === "document" || b.type === "file") {
+        const source = b.source as Record<string, unknown> | undefined;
+        if (source?.type === "base64" && typeof source.data === "string") {
+          const data = source.data;
+          const mediaType = (source.media_type as string) || "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+          const fileName = (b.fileName as string) || (source.fileName as string) || undefined;
+          // If data is already a data URL, use it directly
+          const url = data.startsWith("data:") ? data : `data:${mediaType};base64,${data}`;
+          documents.push({ url, mimeType: mediaType, fileName });
+        }
+      }
+    }
+  }
+
+  return documents;
 }
 
 export function renderReadingIndicatorGroup(assistant?: AssistantIdentity, basePath?: string) {
@@ -547,6 +595,34 @@ function renderMessageImages(images: ImageBlock[]) {
   `;
 }
 
+function renderMessageDocuments(documents: DocumentBlock[]) {
+  if (documents.length === 0) {
+    return nothing;
+  }
+
+  return html`
+    <div class="chat-message-documents">
+      ${documents.map(
+        (doc) => {
+          const isWord = isWordDocumentMimeType(doc.mimeType);
+          const fileName = doc.fileName || (isWord ? "Word Document" : "File");
+          return html`
+            <div class="chat-message-document">
+              <div class="chat-message-document-icon">
+                <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/>
+                  <polyline points="14 2 14 8 20 8"/>
+                </svg>
+              </div>
+              <div class="chat-message-document-name">${fileName}</div>
+            </div>
+          `;
+        },
+      )}
+    </div>
+  `;
+}
+
 /** Render tool cards inside a collapsed `<details>` element. */
 function renderCollapsedToolCards(
   toolCards: ToolCard[],
@@ -652,7 +728,9 @@ function renderGroupedMessage(
   const toolCards = (opts.showToolCalls ?? true) ? extractToolCards(message) : [];
   const hasToolCards = toolCards.length > 0;
   const images = extractImages(message);
+  const documents = extractDocuments(message);
   const hasImages = images.length > 0;
+  const hasDocuments = documents.length > 0;
 
   const extractedText = extractTextCached(message);
   const extractedThinking =
@@ -676,7 +754,7 @@ function renderGroupedMessage(
 
   // Suppress empty bubbles when tool cards are the only content and toggle is off
   const visibleToolCards = hasToolCards && (opts.showToolCalls ?? true);
-  if (!markdown && !visibleToolCards && !hasImages) {
+  if (!markdown && !visibleToolCards && !hasImages && !hasDocuments) {
     return nothing;
   }
 
@@ -718,6 +796,7 @@ function renderGroupedMessage(
               </summary>
               <div class="chat-tool-msg-body">
                 ${renderMessageImages(images)}
+                ${renderMessageDocuments(documents)}
                 ${
                   reasoningMarkdown
                     ? html`<div class="chat-thinking">${unsafeHTML(
@@ -744,6 +823,7 @@ function renderGroupedMessage(
           `
           : html`
             ${renderMessageImages(images)}
+            ${renderMessageDocuments(documents)}
             ${
               reasoningMarkdown
                 ? html`<div class="chat-thinking">${unsafeHTML(

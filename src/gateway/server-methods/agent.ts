@@ -35,7 +35,8 @@ import {
   normalizeMessageChannel,
 } from "../../utils/message-channel.js";
 import { resolveAssistantIdentity } from "../assistant-identity.js";
-import { parseMessageWithAttachments } from "../chat-attachments.js";
+import { parseMessageWithAllAttachments } from "../chat-attachments.js";
+import { saveUploadAttachments } from "./chat-attachments-save.js";
 import { resolveAssistantAvatarUrl } from "../control-ui-shared.js";
 import { ADMIN_SCOPE } from "../method-scopes.js";
 import { GATEWAY_CLIENT_CAPS, hasGatewayClientCap } from "../protocol/client-info.js";
@@ -288,17 +289,48 @@ export const agentHandlers: GatewayRequestHandlers = {
 
     let message = (request.message ?? "").trim();
     let images: Array<{ type: "image"; data: string; mimeType: string }> = [];
+    let wordDocsText: Array<{ type: "word_document_text"; text: string; fileName?: string }> = [];
     if (normalizedAttachments.length > 0) {
       try {
-        const parsed = await parseMessageWithAttachments(message, normalizedAttachments, {
+        const parsed = await parseMessageWithAllAttachments(message, normalizedAttachments, {
           maxBytes: 5_000_000,
           log: context.logGateway,
         });
         message = parsed.message.trim();
         images = parsed.images;
+        wordDocsText = parsed.wordDocs;
       } catch (err) {
         respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, String(err)));
         return;
+      }
+    }
+
+    // Inject Word document text into the message
+    if (wordDocsText.length > 0) {
+      const wordDocContents = wordDocsText
+        .map((doc) => {
+          const header = doc.fileName
+            ? `--- Word Document: ${doc.fileName} ---\n`
+            : "--- Word Document ---\n";
+          return `${header}${doc.text}\n`;
+        })
+        .join("\n");
+      message = message
+        ? `${message}\n\n${wordDocContents}`
+        : wordDocContents;
+    }
+
+    // Save attachments to workspace uploads folder
+    let savedAttachments: Awaited<ReturnType<typeof saveUploadAttachments>> = [];
+    if (normalizedAttachments.length > 0) {
+      const workspaceDir = cfg?.agent?.defaults?.workspace;
+      savedAttachments = await saveUploadAttachments(normalizedAttachments, {
+        workspaceDir,
+      });
+      if (savedAttachments.length > 0) {
+        context.logGateway.info(
+          `[agent.send] Saved ${savedAttachments.length} attachment(s) to workspace uploads: ${savedAttachments.map((a) => a.relativePath).join(", ")}`,
+        );
       }
     }
 

@@ -35,7 +35,8 @@ import {
   isChatStopCommandText,
   resolveChatRunExpiresAtMs,
 } from "../chat-abort.js";
-import { type ChatImageContent, parseMessageWithAttachments } from "../chat-attachments.js";
+import { type ChatImageContent, parseMessageWithAllAttachments } from "../chat-attachments.js";
+import { saveUploadAttachments } from "./chat-attachments-save.js";
 import { stripEnvelopeFromMessage, stripEnvelopeFromMessages } from "../chat-sanitize.js";
 import { ADMIN_SCOPE } from "../method-scopes.js";
 import { resolveSessionPathFromClient } from "../session-path-resolver.js";
@@ -1327,19 +1328,37 @@ export const chatHandlers: GatewayRequestHandlers = {
     }
     let parsedMessage = inboundMessage;
     let parsedImages: ChatImageContent[] = [];
+    let wordDocsText: Array<{ type: "word_document_text"; text: string; fileName?: string }> = [];
     if (normalizedAttachments.length > 0) {
       try {
-        const parsed = await parseMessageWithAttachments(inboundMessage, normalizedAttachments, {
+        const parsed = await parseMessageWithAllAttachments(inboundMessage, normalizedAttachments, {
           maxBytes: 5_000_000,
           log: context.logGateway,
         });
         parsedMessage = parsed.message;
         parsedImages = parsed.images;
+        wordDocsText = parsed.wordDocs;
       } catch (err) {
         respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, String(err)));
         return;
       }
     }
+
+    // Inject Word document text into the message
+    if (wordDocsText.length > 0) {
+      const wordDocContents = wordDocsText
+        .map((doc) => {
+          const header = doc.fileName
+            ? `--- Word Document: ${doc.fileName} ---\n`
+            : "--- Word Document ---\n";
+          return `${header}${doc.text}\n`;
+        })
+        .join("\n");
+      parsedMessage = parsedMessage
+        ? `${parsedMessage}\n\n${wordDocContents}`
+        : wordDocContents;
+    }
+
     const rawSessionKey = p.sessionKey;
     const sessionPath = resolveSessionPathFromClient(client);
     console.log("[chat.send] sessionPath resolved:", sessionPath);
@@ -1349,6 +1368,22 @@ export const chatHandlers: GatewayRequestHandlers = {
       sessionId: entry?.sessionId,
       sessionFile: entry?.sessionFile
     });
+
+    // Save attachments to workspace uploads folder
+    let savedAttachments: Awaited<ReturnType<typeof saveUploadAttachments>> = [];
+    if (normalizedAttachments.length > 0) {
+      const workspaceDir = cfg?.agent?.defaults?.workspace;
+      savedAttachments = await saveUploadAttachments(normalizedAttachments, {
+        sessionKey: rawSessionKey,
+        workspaceDir,
+      });
+      if (savedAttachments.length > 0) {
+        context.logGateway.info(
+          `[chat.send] Saved ${savedAttachments.length} attachment(s) to workspace uploads: ${savedAttachments.map((a) => a.relativePath).join(", ")}`,
+        );
+      }
+    }
+
     const timeoutMs = resolveAgentTimeoutMs({
       cfg,
       overrideMs: p.timeoutMs,

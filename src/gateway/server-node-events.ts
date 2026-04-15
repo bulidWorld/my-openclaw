@@ -13,7 +13,7 @@ import { registerApnsRegistration } from "../infra/push-apns.js";
 import { enqueueSystemEvent } from "../infra/system-events.js";
 import { normalizeMainKey, scopedHeartbeatWakeOptions } from "../routing/session-key.js";
 import { defaultRuntime } from "../runtime.js";
-import { parseMessageWithAttachments } from "./chat-attachments.js";
+import { parseMessageWithAllAttachments } from "./chat-attachments.js";
 import { normalizeRpcAttachmentsToChatAttachments } from "./server-methods/attachment-normalize.js";
 import type { NodeEvent, NodeEventContext } from "./server-node-events-types.js";
 import { loadSessionEntry, migrateAndPruneGatewaySessionStoreKey } from "./session-utils.js";
@@ -354,17 +354,32 @@ export const handleNodeEvent = async (ctx: NodeEventContext, nodeId: string, evt
         link?.attachments ?? undefined,
       );
       let images: Array<{ type: "image"; data: string; mimeType: string }> = [];
+      let wordDocsText: Array<{ type: "word_document_text"; text: string; fileName?: string }> = [];
       if (normalizedAttachments.length > 0) {
         try {
-          const parsed = await parseMessageWithAttachments(message, normalizedAttachments, {
+          const parsed = await parseMessageWithAllAttachments(message, normalizedAttachments, {
             maxBytes: 5_000_000,
             log: ctx.logGateway,
           });
           message = parsed.message.trim();
           images = parsed.images;
+          wordDocsText = parsed.wordDocs;
         } catch {
           return;
         }
+      }
+
+      // Inject Word document text into the message
+      if (wordDocsText.length > 0) {
+        const wordDocContents = wordDocsText
+          .map((doc) => {
+            const header = doc.fileName
+              ? `--- Word Document: ${doc.fileName} ---\n`
+              : "--- Word Document ---\n";
+            return `${header}${doc.text}\n`;
+          })
+          .join("\n");
+        message = message ? `${message}\n\n${wordDocContents}` : wordDocContents;
       }
       if (!message) {
         return;

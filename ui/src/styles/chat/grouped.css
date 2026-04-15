@@ -483,3 +483,50 @@ img.chat-avatar {
 .chat-delete-confirm__yes:hover {
   background: #dc2626;
 }
+
+/* Document attachments in messages */
+.chat-message-documents {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 8px 0;
+}
+
+.chat-message-document {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: var(--bg-hover, rgba(255, 255, 255, 0.06));
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.1));
+  border-radius: var(--radius-md, 8px);
+  cursor: pointer;
+  transition: background 120ms ease-out;
+}
+
+.chat-message-document:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.chat-message-document-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent);
+  flex-shrink: 0;
+}
+
+.chat-message-document-icon svg {
+  width: 24px;
+  height: 24px;
+}
+
+.chat-message-document-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--fg);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 200px;
+}

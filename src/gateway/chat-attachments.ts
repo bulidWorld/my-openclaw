@@ -1,5 +1,6 @@
 import { estimateBase64DecodedBytes } from "../media/base64.js";
 import { sniffMimeFromBase64 } from "../media/sniff-mime-from-base64.js";
+import { extractWordContent, isWordDocumentMimeType } from "../media/word-extract.js";
 
 export type ChatAttachment = {
   type?: string;
@@ -21,6 +22,12 @@ export type ChatWordDocumentContent = {
   fileName?: string;
 };
 
+export type ChatWordDocumentText = {
+  type: "word_document_text";
+  text: string;
+  fileName?: string;
+};
+
 export type ParsedMessageWithImages = {
   message: string;
   images: ChatImageContent[];
@@ -29,6 +36,12 @@ export type ParsedMessageWithImages = {
 export type ParsedMessageWithWordDocs = {
   message: string;
   wordDocs: ChatWordDocumentContent[];
+};
+
+export type ParsedMessageWithAttachments = {
+  message: string;
+  images: ChatImageContent[];
+  wordDocs: ChatWordDocumentText[];
 };
 
 type AttachmentLog = {
@@ -215,7 +228,83 @@ export async function parseMessageWithAttachments(
 }
 
 /**
- * @deprecated Use parseMessageWithAttachments instead.
+ * Parse attachments and extract both images and Word documents.
+ * Word documents are converted to text content for the agent to process.
+ * Returns the message text, images, and extracted Word document text.
+ */
+export async function parseMessageWithAllAttachments(
+  message: string,
+  attachments: ChatAttachment[] | undefined,
+  opts?: { maxBytes?: number; log?: AttachmentLog },
+): Promise<ParsedMessageWithAttachments> {
+  const maxBytes = opts?.maxBytes ?? 5_000_000; // 5MB decoded bytes
+  const log = opts?.log;
+  if (!attachments || attachments.length === 0) {
+    return { message, images: [], wordDocs: [] };
+  }
+
+  const images: ChatImageContent[] = [];
+  const wordDocs: ChatWordDocumentText[] = [];
+
+  for (const [idx, att] of attachments.entries()) {
+    if (!att) {
+      continue;
+    }
+    const normalized = normalizeAttachment(att, idx, {
+      stripDataUrlPrefix: true,
+      requireImageMime: false,
+    });
+    validateAttachmentBase64OrThrow(normalized, { maxBytes });
+    const { base64: b64, label, mime } = normalized;
+
+    const providedMime = normalizeMime(mime);
+
+    // Check if it's a Word document
+    if (isWordDocumentMimeType(providedMime)) {
+      try {
+        const buffer = Buffer.from(b64, "base64");
+        const extracted = await extractWordContent({ buffer });
+        if (extracted.text.trim()) {
+          wordDocs.push({
+            type: "word_document_text",
+            text: extracted.text,
+            fileName: label,
+          });
+        }
+      } catch (err) {
+        log?.warn(`attachment ${label}: failed to extract Word document content: ${String(err)}`);
+      }
+      continue;
+    }
+
+    // Otherwise, try to process as image
+    const sniffedMime = normalizeMime(await sniffMimeFromBase64(b64));
+    if (sniffedMime && !isImageMime(sniffedMime)) {
+      log?.warn(`attachment ${label}: detected non-image (${sniffedMime}), dropping`);
+      continue;
+    }
+    if (!sniffedMime && !isImageMime(providedMime)) {
+      log?.warn(`attachment ${label}: unable to detect image mime type, dropping`);
+      continue;
+    }
+    if (sniffedMime && providedMime && sniffedMime !== providedMime) {
+      log?.warn(
+        `attachment ${label}: mime mismatch (${providedMime} -> ${sniffedMime}), using sniffed`,
+      );
+    }
+
+    images.push({
+      type: "image",
+      data: b64,
+      mimeType: sniffedMime ?? providedMime ?? mime,
+    });
+  }
+
+  return { message, images, wordDocs };
+}
+
+/**
+ * @deprecated Use parseMessageWithAllAttachments instead.
  * This function converts images to markdown data URLs which Claude API cannot process as images.
  */
 export function buildMessageWithAttachments(
