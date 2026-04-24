@@ -64,6 +64,12 @@ async function readWorkspaceFileWithGuards(params: {
     maxBytes: MAX_WORKSPACE_BOOTSTRAP_FILE_BYTES,
   });
   if (!opened.ok) {
+    console.log("[workspace] readWorkspaceFileWithGuards failed:", {
+      filePath: params.filePath,
+      workspaceDir: params.workspaceDir,
+      reason: opened.reason,
+      error: opened.error,
+    });
     workspaceFileCache.delete(params.filePath);
     return opened;
   }

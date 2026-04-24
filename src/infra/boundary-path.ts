@@ -308,7 +308,9 @@ function applyResolvedSymlinkHop(params: {
   rootCanonicalPath: string;
   boundaryLabel: string;
 }): void {
+  console.log(`[boundary-path] resolveSymlinkHop: cursor=${params.state.lexicalCursor} -> resolved=${params.linkCanonical}, rootCanonicalPath=${params.rootCanonicalPath}`);
   if (!isPathInside(params.rootCanonicalPath, params.linkCanonical)) {
+    console.log(`[boundary-path] SYMLINK ESCAPED: resolved path is outside root boundary`);
     throw symlinkEscapeError({
       boundaryLabel: params.boundaryLabel,
       rootCanonicalPath: params.rootCanonicalPath,
@@ -402,6 +404,10 @@ async function resolveBoundaryPathLexicalAsync(params: {
     });
     if (!stat) {
       break;
+    }
+
+    if (stat.isSymbolicLink()) {
+      console.log(`[boundary-path] Symlink detected at segment ${idx}: ${state.lexicalCursor}`);
     }
 
     const disposition = handleLexicalStatDisposition({
@@ -510,6 +516,7 @@ function createBoundaryResolutionContext(params: {
   outsideLexicalCanonicalPath?: string;
 }): BoundaryResolutionContext {
   const lexicalInside = isPathInside(params.rootPath, params.absolutePath);
+  console.log(`[boundary-path] createContext: rootPath=${params.rootPath} absolutePath=${params.absolutePath} rootCanonicalPath=${params.rootCanonicalPath} lexicalInside=${lexicalInside}`);
   const canonicalOutsideLexicalPath = resolveCanonicalOutsideLexicalPath({
     absolutePath: params.absolutePath,
     outsideLexicalCanonicalPath: params.outsideLexicalCanonicalPath,
