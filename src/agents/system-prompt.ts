@@ -662,7 +662,9 @@ export function buildAgentSystemPrompt(params: {
     `Reasoning: ${reasoningLevel} (hidden unless on/stream). Toggle /reasoning; /status shows Reasoning when enabled.`,
   );
 
-  return lines.filter(Boolean).join("\n");
+  const prompt = lines.filter(Boolean).join("\n");
+  console.log("[system-prompt] Built agent system prompt:", prompt);
+  return prompt;
 }
 
 export function buildRuntimeLine(
