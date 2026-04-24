@@ -172,7 +172,8 @@ async function downloadFileFromHref(downloadPath: string): Promise<void> {
     const contentDisposition = response.headers.get("Content-Disposition");
     let filename = "download";
     if (contentDisposition) {
-      const filenameMatch = contentDisposition.match(/filename="?(.+)"?/i);
+      const filenameMatch = contentDisposition.match(/filename="([^"]+)"/i)
+        ?? contentDisposition.match(/filename=(\S+)/i);
       if (filenameMatch) {
         filename = filenameMatch[1];
       }
