@@ -1,0 +1,37 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Gateway (Attach)",
+            "type": "node",
+            "request": "attach",
+            "address": "localhost",
+            "port": 9229,
+            "skipFiles": [
+                "<node_internals>/**",
+                "**/node_modules/**"
+            ]
+        },
+        {
+            "name": "Gateway (Run)",
+            "type": "node",
+            "request": "launch",
+            "cwd": "${workspaceFolder}",
+            "runtimeExecutable": "pnpm",
+            "runtimeArgs": [
+                "openclaw",
+                "gateway"
+            ],
+            "console": "integratedTerminal",
+            "skipFiles": [
+                "<node_internals>/**",
+                "**/node_modules/**"
+            ],
+            "env": {
+                "OPENCLAW_LOG_LEVEL": "debug",
+                "NODE_OPTIONS": "--inspect=9229",
+                "DEBUG_CATEGORY": "tool-calls"
+            }
+        }
+    ]
+}

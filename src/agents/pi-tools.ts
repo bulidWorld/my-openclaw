@@ -58,6 +58,9 @@ import {
   resolveToolProfilePolicy,
 } from "./tool-policy.js";
 import { resolveWorkspaceRoot } from "./workspace-dir.js";
+import { createDebugLogger, DEBUG_CATEGORIES } from "../utils/debug-logger.js";
+
+const toolLogger = createDebugLogger(DEBUG_CATEGORIES.TOOL_CALLS);
 
 function isOpenAIProvider(provider?: string) {
   const normalized = provider?.trim().toLowerCase();
@@ -276,6 +279,20 @@ export function createOpenClawCodingTools(options?: {
   /** Callback invoked when sessions_yield tool is called. */
   onYield?: (message: string) => Promise<void> | void;
 }): AnyAgentTool[] {
+  // Log function entry when debug is enabled
+  if (toolLogger.isEnabled()) {
+    toolLogger.info("=== Creating OpenClaw Coding Tools ===", JSON.stringify({
+      agentId: options?.agentId,
+      sessionKey: options?.sessionKey?.slice(0, 16),
+      sessionId: options?.sessionId,
+      agentDir: options?.agentDir,
+      sandboxed: !!options?.sandbox?.enabled,
+      modelProvider: options?.modelProvider,
+      modelId: options?.modelId,
+      trigger: options?.trigger,
+      disableMessageTool: options?.disableMessageTool,
+    }));
+  }
   const execToolName = "exec";
   const sandbox = options?.sandbox?.enabled ? options.sandbox : undefined;
   const isMemoryFlushRun = options?.trigger === "memory";
@@ -628,5 +645,25 @@ export function createOpenClawCodingTools(options?: {
   // NOTE: Keep canonical (lowercase) tool names here.
   // pi-ai's Anthropic OAuth transport remaps tool names to Claude Code-style names
   // on the wire and maps them back for tool dispatch.
+
+  // Log final tool list when debug is enabled
+  if (toolLogger.isEnabled()) {
+    const finalToolNames = withAbort.map((t) => t.name);
+    toolLogger.info(`OpenClaw Coding Tools created: ${finalToolNames.length} tools`, JSON.stringify({
+      tools: finalToolNames,
+      afterPolicySteps: [
+        "profile",
+        "providerProfile",
+        "global",
+        "globalProvider",
+        "agent",
+        "agentProvider",
+        "group",
+        "sandbox",
+        "subagent",
+      ],
+    }));
+  }
+
   return withAbort;
 }

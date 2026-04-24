@@ -29,11 +29,8 @@ import {
   type ResolvedGatewayAuth,
 } from "./auth.js";
 import { normalizeCanvasScopedUrl } from "./canvas-capability.js";
-import {
-  handleControlUiAvatarRequest,
-  handleControlUiHttpRequest,
-  type ControlUiRootState,
-} from "./control-ui.js";
+import { handleControlUiAvatarRequest, handleControlUiHttpRequest, type ControlUiRootState } from "./control-ui.js";
+import { handleDownloadWorkspaceRequest } from "./download-workspace.js";
 import { handleOpenAiEmbeddingsHttpRequest } from "./embeddings-http.js";
 import { applyHookMappings } from "./hooks-mapping.js";
 import {
@@ -988,6 +985,11 @@ export function createGatewayHttpServer(opts: {
             allowRealIpFallback,
             getReadiness,
           ),
+      });
+
+      requestStages.push({
+        name: "download-workspace",
+        run: () => handleDownloadWorkspaceRequest(req, res),
       });
 
       if (await runGatewayHttpRequestStages(requestStages)) {

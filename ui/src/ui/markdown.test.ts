@@ -162,4 +162,34 @@ describe("toSanitizedMarkdownHtml", () => {
       warnSpy.mockRestore();
     }
   });
+
+  it("preserves <a> tags unescaped", () => {
+    const html = toSanitizedMarkdownHtml('Click <a href="/home/workspace" filePosition="1234" >here</a> for more');
+    // <a> tag should not be escaped (DOMPurify may add rel/target attributes for security)
+    expect(html).toContain('<a href="/home/workspace"');
+    expect(html).toContain(">here</a>");
+    expect(html).not.toContain("&lt;a");
+    expect(html).not.toContain("&gt;here&lt;/a&gt;");
+  });
+
+  it("preserves <a> tags with multiple attributes", () => {
+    const html = toSanitizedMarkdownHtml(
+      '<a href="https://example.com" target="_blank" class="link">Link</a>',
+    );
+    expect(html).toContain('<a href="https://example.com"');
+    expect(html).toContain('target="_blank"');
+    expect(html).toContain('class="link"');
+  });
+
+  it("still escapes other HTML tags", () => {
+    const html = toSanitizedMarkdownHtml('<script>alert(1)</script>');
+    expect(html).not.toContain("<script>");
+    expect(html).toContain("&lt;script&gt;");
+  });
+
+  it("escapes <a> tags with unsafe javascript: href", () => {
+    // DOMPurify should strip javascript: URLs
+    const html = toSanitizedMarkdownHtml('<a href="javascript:alert(1)">Click</a>');
+    expect(html).not.toContain("javascript:");
+  });
 });

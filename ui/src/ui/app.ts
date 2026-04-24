@@ -801,6 +801,8 @@ export class OpenClawApp extends LitElement {
   }
 
   render() {
-    return renderApp(this as unknown as AppViewState);
+    const renderResult = renderApp(this as unknown as AppViewState);
+    console.log(renderResult);
+    return renderResult;
   }
 }

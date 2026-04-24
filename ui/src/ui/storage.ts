@@ -121,6 +121,32 @@ function tokenSessionKeyForGateway(gatewayUrl: string): string {
   return `${TOKEN_SESSION_KEY_PREFIX}${normalizeGatewayTokenScope(gatewayUrl)}`;
 }
 
+/**
+ * 获取所有以 TOKEN_SESSION_KEY_PREFIX 开头的 storage key 对应的 token
+ * @returns 键值对，key 为完整的 storage key，value 为 token 值
+ */
+export function getAllSessionTokens(): Record<string, string> {
+  const result: Record<string, string> = {};
+  try {
+    const storage = getSessionStorage();
+    if (!storage) {
+      return result;
+    }
+    for (let i = 0; i < storage.length; i++) {
+      const key = storage.key(i);
+      if (key && key.startsWith(TOKEN_SESSION_KEY_PREFIX)) {
+        const value = storage.getItem(key);
+        if (value && typeof value === "string") {
+          result[key] = value.trim();
+        }
+      }
+    }
+  } catch {
+    // best-effort
+  }
+  return result;
+}
+
 function resolveScopedSessionSelection(
   gatewayUrl: string,
   parsed: PersistedUiSettings,
@@ -163,9 +189,13 @@ function loadSessionToken(gatewayUrl: string): string {
       return "";
     }
     storage.removeItem(LEGACY_TOKEN_SESSION_KEY);
-    const token = storage.getItem(tokenSessionKeyForGateway(gatewayUrl)) ?? "";
+    const key = tokenSessionKeyForGateway(gatewayUrl);
+    console.log('[loadSessionToken] gatewayUrl:', gatewayUrl, 'key:', key);
+    const token = storage.getItem(key) ?? "";
+    console.log('[loadSessionToken] token found:', token ? 'yes (length=' + token.length + ')' : 'no');
     return token.trim();
-  } catch {
+  } catch (err) {
+    console.error('[loadSessionToken] error:', err);
     return "";
   }
 }
@@ -342,4 +372,26 @@ function persistSettings(next: UiSettings) {
     // best-effort — quota exceeded or security restrictions should not
     // prevent in-memory settings and visual updates from being applied
   }
+}
+
+/**
+ * 为 fetch 请求构建认证头
+ *
+ * @param token - 可选的 token，如果不传则自动从 sessionStorage 获取第一条匹配的 token
+ * @returns 认证头对象
+ */
+export function buildAuthHeaders(token?: string): Record<string, string> {
+  const effectiveToken = token ?? (() => {
+    const allTokens = getAllSessionTokens();
+    const firstKey = Object.keys(allTokens)[0];
+    return firstKey ? allTokens[firstKey] : "";
+  })();
+  const headers: Record<string, string> = {};
+
+  if (effectiveToken) {
+    headers["Authorization"] = `Bearer ${effectiveToken}`;
+    headers["X-OpenClaw-Token"] = effectiveToken;
+  }
+
+  return headers;
 }

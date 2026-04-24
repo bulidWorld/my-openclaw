@@ -181,11 +181,6 @@ export function loadSessionStore(
   opts: LoadSessionStoreOptions = {},
 ): Record<string, SessionEntry> {
 
-  console.log("[loadSessionStore] called", {
-    stack: new Error().stack?.split("\n").slice(1, 21).join("\n")
-  });
-
-  console.log("[loadSessionStore] storePath:", storePath, "skipCache:", opts.skipCache);
   // Check cache first if enabled
   if (!opts.skipCache && isSessionStoreCacheEnabled()) {
     const currentFileStat = getFileStatSnapshot(storePath);

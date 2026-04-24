@@ -25,6 +25,10 @@ openclaw/
 └── ui/                  # Control UI (Lit-based web frontend)
 ```
 
+
+## 新增调试日志，代码写法：
+详细用法见 [DEBUG_LOGS_GUIDE.md](./DEBUG_LOGS_GUIDE.md)。
+
 **Import boundaries:**
 - Extension code should only import from `openclaw/plugin-sdk/*` and local `api.ts`/`runtime-api.ts` barrels
 - Never import core `src/**`, `src/plugin-sdk-internal/**`, or another extension's `src/**` directly from extensions

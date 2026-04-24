@@ -8,6 +8,10 @@ import { isPlainObject } from "../utils.js";
 import { copyChannelAgentToolMeta } from "./channel-tools.js";
 import { normalizeToolName } from "./tool-policy.js";
 import type { AnyAgentTool } from "./tools/common.js";
+import { createDebugLogger, DEBUG_CATEGORIES } from "../utils/debug-logger.js";
+
+const toolCallLogger = createDebugLogger(DEBUG_CATEGORIES.TOOL_CALLS);
+const toolResultLogger = createDebugLogger(DEBUG_CATEGORIES.TOOL_RESULTS);
 
 export type HookContext = {
   agentId?: string;
@@ -205,6 +209,16 @@ export function wrapToolWithBeforeToolCallHook(
   const wrappedTool: AnyAgentTool = {
     ...tool,
     execute: async (toolCallId, params, signal, onUpdate) => {
+      // Log tool call when debug is enabled
+      if (toolCallLogger.isEnabled()) {
+        toolCallLogger.info(`Tool call: ${toolName}`, JSON.stringify({
+          toolCallId: toolCallId ? String(toolCallId).slice(0, 16) : undefined,
+          params: params ? JSON.stringify(params).slice(0, 200) : undefined,
+          sessionId: ctx?.sessionId,
+          sessionKey: ctx?.sessionKey?.slice(0, 16),
+        }));
+      }
+
       const outcome = await runBeforeToolCallHook({
         toolName,
         params,
@@ -212,6 +226,12 @@ export function wrapToolWithBeforeToolCallHook(
         ctx,
       });
       if (outcome.blocked) {
+        if (toolResultLogger.isEnabled()) {
+          toolResultLogger.warn(`Tool blocked: ${toolName}`, JSON.stringify({
+            toolCallId: toolCallId ? String(toolCallId).slice(0, 16) : undefined,
+            reason: outcome.reason,
+          }));
+        }
         throw new Error(outcome.reason);
       }
       if (toolCallId) {
@@ -225,8 +245,22 @@ export function wrapToolWithBeforeToolCallHook(
         }
       }
       const normalizedToolName = normalizeToolName(toolName || "tool");
+      const startTime = Date.now();
       try {
         const result = await execute(toolCallId, outcome.params, signal, onUpdate);
+        const duration = Date.now() - startTime;
+
+        // Log successful tool result
+        if (toolResultLogger.isEnabled()) {
+          const resultStr = String(result ?? "");
+          toolResultLogger.info(`Tool result: ${toolName}`, JSON.stringify({
+            toolCallId: toolCallId ? String(toolCallId).slice(0, 16) : undefined,
+            success: true,
+            durationMs: duration,
+            resultPreview: resultStr.slice(0, 200),
+          }));
+        }
+
         await recordLoopOutcome({
           ctx,
           toolName: normalizedToolName,
@@ -236,6 +270,18 @@ export function wrapToolWithBeforeToolCallHook(
         });
         return result;
       } catch (err) {
+        const duration = Date.now() - startTime;
+
+        // Log tool error
+        if (toolResultLogger.isEnabled()) {
+          toolResultLogger.warn(`Tool error: ${toolName}`, JSON.stringify({
+            toolCallId: toolCallId ? String(toolCallId).slice(0, 16) : undefined,
+            success: false,
+            durationMs: duration,
+            error: String(err),
+          }));
+        }
+
         await recordLoopOutcome({
           ctx,
           toolName: normalizedToolName,

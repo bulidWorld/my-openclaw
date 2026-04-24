@@ -357,11 +357,6 @@ function resolveTranscriptUsageFallback(params: {
 }
 
 export function loadSessionEntry(sessionKey: string, sessionPath?: string) {
-  console.log("[loadSessionEntry] called", {
-    sessionKey,
-    sessionPath,
-    stack: new Error().stack?.split("\n").slice(1, 21).join("\n")
-  });
   const cfg = loadConfig();
   const canonicalKey = resolveSessionStoreKey({ cfg, sessionKey });
   const agentId = resolveSessionStoreAgentId(cfg, canonicalKey);
@@ -946,11 +941,6 @@ export function loadCombinedSessionStoreForGateway(
   store: Record<string, SessionEntry>;
 } {
   const storeConfig = cfg.session?.store;
-  console.log("[loadCombinedSessionStoreForGateway] called", {
-    sessionPath,
-    storeConfig: typeof storeConfig === "string" ? storeConfig : "object/undefined",
-    stack: new Error().stack?.split("\n").slice(1, 21).join("\n")
-  });
 
   // When sessionPath is provided (e.g., LDAP user), load only that specific store
   // and do not merge with other agent stores for session isolation

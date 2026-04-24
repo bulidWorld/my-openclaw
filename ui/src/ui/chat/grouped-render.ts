@@ -768,8 +768,8 @@ function renderGroupedMessage(
     markdown && !toolSummaryLabel ? markdown.trim().replace(/\s+/g, " ").slice(0, 120) : "";
 
   const hasActions = canCopyMarkdown || canExpand;
-
-  return html`
+  
+  const htmlContent =  html`
     <div class="${bubbleClasses}">
       ${
         hasActions
@@ -849,4 +849,5 @@ function renderGroupedMessage(
       }
     </div>
   `;
+  return htmlContent
 }

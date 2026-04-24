@@ -36,6 +36,11 @@ export function classifyControlUiRequest(params: {
     if (pathname === "/api" || pathname.startsWith("/api/")) {
       return { kind: "not-control-ui" };
     }
+    // Exclude download endpoint from Control UI catch-all
+    if (pathname === "/download/workspace") {
+      console.log("[control-ui-routing] excluding /download/workspace from Control UI");
+      return { kind: "not-control-ui" };
+    }
     if (!isReadHttpMethod(method)) {
       return { kind: "not-control-ui" };
     }

@@ -1,6 +1,7 @@
 import DOMPurify from "dompurify";
 import { marked } from "marked";
 import { truncateText } from "./format.ts";
+import { buildAuthHeaders } from "./storage.ts";
 
 const allowedTags = [
   "a",
@@ -46,6 +47,7 @@ const allowedAttrs = [
   "src",
   "alt",
   "data-code",
+  "data-download-path",
   "type",
   "aria-label",
 ];
@@ -56,6 +58,7 @@ const sanitizeOptions = {
 };
 
 let hooksInstalled = false;
+let eventDelegateInstalled = false;
 const MARKDOWN_CHAR_LIMIT = 140_000;
 const MARKDOWN_PARSE_LIMIT = 40_000;
 const MARKDOWN_CACHE_LIMIT = 200;
@@ -95,14 +98,18 @@ function installHooks() {
     if (!(node instanceof HTMLAnchorElement)) {
       return;
     }
-    const href = node.getAttribute("href");
-    if (!href) {
+    // 处理下载链接 (render-download-cls 类)
+    if (node.classList.contains("render-download-cls")) {
+      // 移除 href 防止默认跳转
+      node.removeAttribute("href");
+      node.setAttribute("role", "button");
+      node.style.cursor = "pointer";
       return;
     }
 
     // Block dangerous URL schemes (javascript:, data:, vbscript:, etc.)
     try {
-      const url = new URL(href, window.location.href);
+      const url = new URL(node.href, window.location.href);
       if (url.protocol !== "http:" && url.protocol !== "https:" && url.protocol !== "mailto:") {
         node.removeAttribute("href");
         return;
@@ -115,10 +122,89 @@ function installHooks() {
 
     node.setAttribute("rel", "noreferrer noopener");
     node.setAttribute("target", "_blank");
-    if (href.toLowerCase().includes("tail")) {
+    if (node.href.toLowerCase().includes("tail")) {
       node.classList.add(TAIL_LINK_BLUR_CLASS);
     }
   });
+
+  // 安装全局事件委托处理器
+  if (!eventDelegateInstalled) {
+    eventDelegateInstalled = true;
+    document.addEventListener("click", (e) => {
+      const target = e.target as HTMLElement;
+      const downloadLink = target.closest("a.render-download-cls");
+      if (downloadLink) {
+        e.preventDefault();
+        e.stopPropagation();
+        const downloadPath = downloadLink.getAttribute("data-download-path");
+        if (downloadPath) {
+          downloadFileFromHref(downloadPath);
+        }
+      }
+    }, true);
+  }
+}
+
+/**
+ * 从 href 下载文件
+ * @param downloadPath - 下载路径，例如 /download/workspace?path=test.txt
+ */
+async function downloadFileFromHref(downloadPath: string): Promise<void> {
+  try {
+    // 确保路径是完整的 URL
+    const url = downloadPath.startsWith("/") ? `${downloadPath}` : downloadPath;
+
+    // 使用工具函数获取认证头
+    const headers = buildAuthHeaders();
+
+    const response = await fetch(url, { headers });
+    if (!response.ok) {
+      if (response.status === 401) {
+        throw new Error("Authentication required. Please log in and try again.");
+      }
+      if (response.status === 403) {
+        throw new Error("Access denied. Your session may have expired.");
+      }
+      throw new Error(`Download failed: ${response.status} ${response.statusText}`);
+    }
+
+    // 获取文件名
+    const contentDisposition = response.headers.get("Content-Disposition");
+    let filename = "download";
+    if (contentDisposition) {
+      const filenameMatch = contentDisposition.match(/filename="?(.+)"?/i);
+      if (filenameMatch) {
+        filename = filenameMatch[1];
+      }
+    }
+
+    // 如果没有从 header 获取到文件名，从 URL 提取
+    if (filename === "download") {
+      const urlParams = new URLSearchParams(new URL(downloadPath, window.location.href).search);
+      filename = urlParams.get("path")?.split("/").pop() || "download";
+    }
+
+    // 获取文件内容作为 blob
+    const blob = await response.blob();
+
+    // 创建下载链接并触发下载
+    const blobUrl = window.URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = blobUrl;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    // 清理 blob URL
+    setTimeout(() => {
+      window.URL.revokeObjectURL(blobUrl);
+    }, 100);
+  } catch (err) {
+    console.error("[download] Failed to download file:", err);
+    // 如果 fetch 失败，尝试直接打开（处理跨域情况）
+    window.open(downloadPath, "_blank");
+  }
 }
 
 export function toSanitizedMarkdownHtml(markdown: string): string {
@@ -174,7 +260,26 @@ export function toSanitizedMarkdownHtml(markdown: string): string {
 // Security is handled by DOMPurify, but rendering pasted HTML (e.g. error
 // pages) as formatted output is confusing UX (#13937).
 const htmlEscapeRenderer = new marked.Renderer();
-htmlEscapeRenderer.html = ({ text }: { text: string }) => escapeHtml(text);
+
+// Allow <a> tags (opening and closing) to pass through unescaped; all other HTML is escaped.
+htmlEscapeRenderer.html = ({ text }: { text: string }) => {
+  const trimmed = text.trim();
+  // Check if it's an <a> opening tag or closing tag
+  const isOpeningAnchor = /^<a\s[^>]*>$/i.test(trimmed);
+  const isClosingAnchor = /^<\/a>$/i.test(trimmed);
+  if (isOpeningAnchor || isClosingAnchor) {
+    // 如果是带有 render-download-cls 类的 <a> 标签，提取 href 并添加 data-download-path 属性
+    if (isOpeningAnchor && trimmed.includes('class="render-download-cls"')) {
+      const hrefMatch = trimmed.match(/href="([^"]*)"/i);
+      if (hrefMatch && hrefMatch[1]) {
+        // 添加 data-download-path 属性用于下载
+        return trimmed.replace('href="', 'data-download-path="').replace('href=', 'data-download-path=');
+      }
+    }
+    return trimmed;
+  }
+  return escapeHtml(text);
+};
 htmlEscapeRenderer.image = (token: { href?: string | null; text?: string | null }) => {
   const label = normalizeMarkdownImageLabel(token.text);
   const href = token.href?.trim() ?? "";

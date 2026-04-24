@@ -29,6 +29,9 @@ import { createTtsTool } from "./tools/tts-tool.js";
 import { createVideoGenerateTool } from "./tools/video-generate-tool.js";
 import { createWebFetchTool, createWebSearchTool } from "./tools/web-tools.js";
 import { resolveWorkspaceRoot } from "./workspace-dir.js";
+import { createDebugLogger, DEBUG_CATEGORIES } from "../utils/debug-logger.js";
+
+const toolLogger = createDebugLogger(DEBUG_CATEGORIES.TOOL_CALLS);
 
 type OpenClawToolsDeps = {
   callGateway: typeof callGateway;
@@ -108,6 +111,17 @@ export function createOpenClawTools(
     options?.sandboxRoot && options?.sandboxFsBridge
       ? { root: options.sandboxRoot, bridge: options.sandboxFsBridge }
       : undefined;
+
+  // Log tool creation when debug is enabled
+  if (toolLogger.isEnabled()) {
+    toolLogger.info("=== Creating OpenClaw Tools ===", JSON.stringify({
+      agentSessionKey: options?.agentSessionKey?.slice(0, 16),
+      agentDir: options?.agentDir ? workspaceDir : "(not set)",
+      sessionId: options?.sessionId,
+      sandboxed: options?.sandboxed,
+      disableMessageTool: options?.disableMessageTool,
+    }));
+  }
   const imageTool = options?.agentDir?.trim()
     ? createImageTool({
         config: options?.config,
@@ -271,6 +285,15 @@ export function createOpenClawTools(
     toolAllowlist: options?.pluginToolAllowlist,
     allowGatewaySubagentBinding: options?.allowGatewaySubagentBinding,
   });
+
+  // Log created tools summary
+  if (toolLogger.isEnabled()) {
+    const toolNames = [...tools, ...pluginTools].map((t) => t.name);
+    toolLogger.info(`OpenClaw Tools created: ${toolNames.length} tools`, JSON.stringify({
+      coreTools: tools.map((t) => t.name),
+      pluginTools: pluginTools.map((t) => t.name),
+    }));
+  }
 
   return [...tools, ...pluginTools];
 }
