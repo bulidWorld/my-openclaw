@@ -9,22 +9,25 @@
     "lib": ["DOM", "DOM.Iterable", "ES2023", "ScriptHost"],
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
-    "noEmit": false,
+    "noEmit": true,
     "noEmitOnError": true,
     "outDir": "dist",
     "resolveJsonModule": true,
     "skipLibCheck": true,
     "strict": true,
     "target": "es2023",
+    "types": ["node"],
     "useDefineForClassFields": false,
-    "sourceMap": true,
     "paths": {
       "openclaw/extension-api": ["./src/extensionAPI.ts"],
       "openclaw/plugin-sdk": ["./src/plugin-sdk/index.ts"],
       "openclaw/plugin-sdk/*": ["./src/plugin-sdk/*.ts"],
-      "openclaw/plugin-sdk/account-id": ["./src/plugin-sdk/account-id.ts"]
+      "@openclaw/plugin-sdk": ["./src/plugin-sdk/index.ts"],
+      "@openclaw/plugin-sdk/*": ["./src/plugin-sdk/*.ts"],
+      "openclaw/plugin-sdk/account-id": ["./src/plugin-sdk/account-id.ts"],
+      "@openclaw/*": ["./extensions/*"]
     }
   },
-  "include": ["src/**/*", "ui/**/*", "extensions/**/*"],
-  "exclude": ["node_modules", "dist"]
+  "include": ["src/**/*", "ui/**/*", "extensions/**/*", "packages/**/*"],
+  "exclude": ["node_modules", "dist", "**/dist/**"]
 }

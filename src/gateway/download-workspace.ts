@@ -1,10 +1,10 @@
 import fs from "node:fs";
-import path from "node:path";
 import type { IncomingMessage, ServerResponse } from "node:http";
+import path from "node:path";
 import { resolveAgentWorkspaceDir } from "../agents/agent-scope.js";
+import { loadConfig } from "../config/config.js";
 import { isPathInside } from "../infra/path-guards.js";
 import { openVerifiedFileSync } from "../infra/safe-open-sync.js";
-import { loadConfig } from "../config/config.js";
 
 /**
  * 处理 /download/workspace 请求
@@ -14,10 +14,7 @@ import { loadConfig } from "../config/config.js";
  *  - path: 文件相对路径（必需）
  *  - agentId: agent ID（可选，默认使用默认 agent）
  */
-export function handleDownloadWorkspaceRequest(
-  req: IncomingMessage,
-  res: ServerResponse,
-): boolean {
+export function handleDownloadWorkspaceRequest(req: IncomingMessage, res: ServerResponse): boolean {
   console.log("[download-workspace] handleDownloadWorkspaceRequest called, url:", req.url);
   const url = new URL(req.url ?? "/", "http://localhost");
 
@@ -64,7 +61,12 @@ export function handleDownloadWorkspaceRequest(
   const candidatePath = path.resolve(workspaceDir, decodedPath);
 
   // 安全检查：防止路径遍历攻击
-  console.log("[download-workspace] checking path safety, workspaceDir:", workspaceDir, "candidatePath:", candidatePath);
+  console.log(
+    "[download-workspace] checking path safety, workspaceDir:",
+    workspaceDir,
+    "candidatePath:",
+    candidatePath,
+  );
   if (!isPathInside(workspaceDir, candidatePath)) {
     console.log("[download-workspace] path traversal detected");
     res.statusCode = 403;
@@ -102,7 +104,7 @@ export function handleDownloadWorkspaceRequest(
   const contentType = getContentType(ext);
   res.statusCode = 200;
   res.setHeader("Content-Type", contentType);
-  res.setHeader("Content-Disposition", `attachment; filename="${path.basename(decodedPath)}"`);
+  res.setHeader("Content-Disposition", `attachment; filename="${crypto.randomUUID()}${ext}"`);
   res.setHeader("Cache-Control", "no-cache");
   res.setHeader("Content-Length", String(buffer.length));
   res.end(buffer);
